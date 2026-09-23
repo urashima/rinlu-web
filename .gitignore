@@ -3,4 +3,5 @@
 *.key
 .env
 .env.*
+!site/.env.example
 node_modules/

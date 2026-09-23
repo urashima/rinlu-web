@@ -1,16 +1,21 @@
 #!/usr/bin/env bash
+# Root-owned entry point: copy reviewed GitHub checkout and deploy TCP/80 site.
 set -Eeuo pipefail
 [[ $EUID -eq 0 ]] || { echo 'Must run via sudo as root.' >&2; exit 1; }
 [[ $# -eq 0 ]] || { echo 'No arguments accepted.' >&2; exit 2; }
 SOURCE=/home/ubuntu/rinlu-staging
 TARGET=/opt/rinlu
-[[ -f "$SOURCE/Dockerfile" && -f "$SOURCE/deploy.sh" && -f "$SOURCE/site/index.html" ]] || { echo 'Deployment staging is incomplete.' >&2; exit 3; }
+[[ -f "$SOURCE/Dockerfile" && -f "$SOURCE/deploy.sh" && -f "$SOURCE/site/index.html" ]] || {
+  echo 'Deployment staging is incomplete; refusing to publish.' >&2; exit 3;
+}
 command -v rsync >/dev/null
 command -v docker >/dev/null
 install -d -m 0755 "$TARGET"
-rsync -a --delete --safe-links --exclude='.git/' --exclude='.github/' --exclude='ops/' "$SOURCE/" "$TARGET/"
+rsync -a --delete --safe-links --exclude='.git/' --exclude='.github/' --exclude='ops/' \
+  "$SOURCE/" "$TARGET/"
 cd "$TARGET"
 bash ./deploy.sh
 curl -fsS --max-time 5 http://127.0.0.1/healthz >/dev/null
 curl -fsS --max-time 5 http://127.0.0.1/ >/dev/null
+curl -fsS --max-time 5 http://127.0.0.1/favicon.ico >/dev/null
 echo 'RINLU published and verified on local TCP/80. No changes to TCP/443.'
