@@ -1,6 +1,6 @@
 # RINLU | Music — OVH Docker deployment
 
-This is a **standalone reconstruction** of the RINLU Music public site using text and selected original RINLU image assets available to this conversation. The private ChatGPT Sites source code could not be exported through the available interface; this is not a byte-for-byte clone. No user login, OpenAI dependency, or external Google Fonts are required to view this website. All current music links are included.
+This repository mirrors the current RINLU Music site built with ChatGPT Sites and deploys it to the OVH server through GitHub Actions. The static site includes Chinese, English, and Japanese pages, current album artwork, and platform-specific album and track links.
 
 ## Scope and safety
 
@@ -54,11 +54,9 @@ sudo bash deploy.sh
 
 To upload a newer release from your computer, use `scp` for the new tarball, extract it under `/tmp`, and copy its contents to `/opt/rinlu` as above, then run `deploy.sh`. Keep the previous package if you want to restore an older release manually. Docker preserves the previous image as `rinlu-web:rollback` upon successful redeployment.
 
-## Future one-message deployment with GitHub
+## Site updates and deployment
 
-After an empty private GitHub repository such as `rinlu-web` is created and this package (without passwords or SSH keys) is committed, enable `.github/workflows/deploy.yml.template` by renaming it to `deploy.yml`. Configure these GitHub Actions repository secrets once: `OVH_HOST` (public IP), `OVH_USER` (`ubuntu`), `OVH_SSH_KEY` (a dedicated private deployment key), and `OVH_KNOWN_HOSTS` (verified host key). Make sure the dedicated SSH key has its public counterpart in `ubuntu`'s `authorized_keys`. The `ubuntu` user needs a noninteractive **limited** ability to execute the deployment command, or a trusted operator must approve sudo, since GitHub Actions can't type a password into sudo. This must be configured intentionally; never store the VPS password in repository code.
-
-The sample workflow pushes source files with `rsync` and runs the existing deployment script. Once configured and the repository is available to the ChatGPT GitHub connector, future requested content changes can be committed to this repo to trigger automatic deployment. ChatGPT Sites edits do **not** automatically sync to this standalone source repository; the website source of truth becomes GitHub.
+When the RINLU site is updated in ChatGPT Sites, mirror the latest exported pages and assets into `site/` and commit them to `main`. The existing `.github/workflows/deploy.yml` then publishes the commit to OVH automatically. The repository workflow is the path from the Sites content to the live `rinlu.com` deployment.
 
 ## HTTPS / 443 phase (separate change)
 
@@ -76,6 +74,6 @@ sudo docker logs --tail=100 rinlu-web
 
 ## Content notes
 
-- The hero and collage assets were recovered from the user's existing RINLU artwork.
-- The original production album-cover image wasn't exposed in the accessible site projection. A previously generated RINLU illustration is used as a **temporary cover placeholder**. Replace `site/assets/rinlu-album.webp` with the approved cover when provided.
-- Nine NetEase song IDs and NetEase album ID 397565520, plus verified user-shared Qobuz and previously discussed Spotify album URLs, are configured.
+- Chinese links point to NetEase Cloud Music, and English and Japanese links point to Spotify.
+- The site has Chinese, English, and Japanese language pages.
+- Artwork files in `site/assets/` are optimized WebP exports from the current site.

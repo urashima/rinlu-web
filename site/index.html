@@ -1,82 +1,22 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-CN">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="theme-color" content="#f9f6ee" />
-  <meta name="description" content="RINLU 音乐官方网站。小小世界，大声喜欢。听见好奇、勇气与成长的旋律。" />
-  <meta property="og:type" content="website" />
-  <meta property="og:title" content="RINLU | Music" />
-  <meta property="og:description" content="小小世界，大声喜欢。A Little World of Music." />
-  <meta property="og:url" content="https://rinlu.com/" />
-  <meta property="og:image" content="https://rinlu.com/assets/rinlu-hero.webp" />
-  <link rel="canonical" href="https://rinlu.com/" />
-  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-  <link rel="icon" href="/favicon.ico" sizes="any" />
-  <link rel="icon" href="/favicon.png" type="image/png" sizes="32x32" />
-  <link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180" />
-  <link rel="manifest" href="/site.webmanifest" />
-  <title>RINLU | Music</title>
-  <link rel="stylesheet" href="/styles.css" />
-  <script src="/app.js" defer></script>
-</head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RINLU — A Little World of Music</title>
+<meta name="description" content="欢迎来到 RINLU 的音乐小宇宙。听见好奇、成长与柔软的小情绪，发现同名专辑的九首歌曲。">
+<meta name="theme-color" content="#ffdc32">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23ffdc32'/%3E%3Ctext x='32' y='47' font-family='Arial' font-size='46' font-weight='900' text-anchor='middle' fill='%23202425'%3ER%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="/styles.css">
+<link rel="alternate" hreflang="zh-CN" href="index.html"><link rel="alternate" hreflang="en" href="en.html"><link rel="alternate" hreflang="ja" href="ja.html"><link rel="alternate" hreflang="x-default" href="index.html"></head>
 <body>
-  <a class="skip-link" href="#main" data-i18n="skip">跳到主要内容</a>
-  <header class="site-header" id="top">
-    <a class="wordmark" href="#top" aria-label="RINLU Home">RINLU<span class="asterisk">✳</span></a>
-    <nav class="nav" aria-label="Main navigation">
-      <a href="#music" data-i18n="navMusic">音乐</a>
-      <a href="#about" data-i18n="navAbout">关于 RINLU</a>
-      <a href="#next" data-i18n="navNext">未完待续</a>
-    </nav>
-    <div class="nav-actions">
-      <div class="languages" aria-label="Language">
-        <button type="button" data-lang="zh" class="is-active" aria-pressed="true">中文</button>
-        <button type="button" data-lang="en" aria-pressed="false">EN</button>
-        <button type="button" data-lang="ja" aria-pressed="false">日本語</button>
-      </div>
-      <a href="#music" class="listen-link" data-i18n="listen">去听歌 ↗</a>
-    </div>
-  </header>
-
-  <main id="main">
-    <section class="intro section-shell" aria-labelledby="hero-title">
-      <div class="hero-copy">
-        <p class="eyebrow"><span class="dot"></span> A LITTLE WORLD OF MUSIC</p>
-        <h1 id="hero-title"><span data-i18n="heroLine1">小小世界，</span><br/><em data-i18n="heroLine2">大声</em> <span data-i18n="heroLine3">喜欢。</span></h1>
-        <p class="lead" data-i18n="heroLead">把奇思妙想唱成歌，把平凡日子过成小小的冒险。</p>
-        <a href="#music" class="primary-btn"><span data-i18n="enter">走进 RINLU 的音乐世界</span><span aria-hidden="true">↗</span></a>
-        <p class="tiny-note" data-i18n="curiosity">好奇心，不设音量上限。</p>
-      </div>
-      <div class="hero-art">
-        <div class="hero-image-wrap"><img src="/assets/rinlu-hero.webp" alt="RINLU 背着熊猫挂件背包，在机场回头挥手" loading="eager" width="1254" height="1254" /></div>
-        <span class="hero-sticker sticker-star" aria-hidden="true">✳</span>
-        <span class="hero-sticker sticker-orbit" aria-hidden="true">♪</span>
-        <span class="hero-number">RINLU · 001</span>
-      </div>
-      <a class="scroll-cue" href="#welcome"><span data-i18n="scroll">向下探索音乐</span><b>↓</b></a>
-    </section>
-
-    <section class="welcome section-shell" id="welcome">
-      <div class="small-art"><span>HELLO, I'M RINLU <span aria-hidden="true">✳</span></span></div>
-      <div class="welcome-title"><p class="eyebrow" data-i18n="nextStopLabel">NEXT STOP · HAPPY</p><h2><span data-i18n="nextStop">下一站，开心。</span><br/><span data-i18n="letsGo">带上耳朵，一起出发！</span></h2></div>
-    </section>
-
-    <section class="music-section section-shell" id="music" aria-labelledby="music-title">
-      <div class="section-heading"><div><p class="section-index">01 / THE MUSIC</p><h2 id="music-title" data-i18n="musicTitle">给生活，加一点旋律。</h2></div><span class="heading-spark" aria-hidden="true">✳</span></div>
-      <div class="album-card">
-        <img class="album-cover" src="/assets/rinlu-album.webp" width="1254" height="1254" alt="RINLU 同名专辑封面" loading="lazy" />
-        <div class="album-info"><p class="eyebrow">THE FIRST ALBUM · 09 TRACKS</p><h3 data-i18n="debut">同名专辑 <span>RINLU ✳</span></h3><p class="album-desc" data-i18n="albumDesc">九首歌，九种小小心情。有好奇，有勇气，也有慢慢长大的温度。</p><div class="release-date"><span data-i18n="release">发行计划</span><strong>2026.09.26</strong></div><a class="dark-btn" href="https://music.163.com/#/album?id=397565520" target="_blank" rel="noopener noreferrer" data-i18n="albumLink">在网易云音乐收听专辑 ↗</a></div>
-      </div>
-      <div class="track-header"><h3 data-i18n="tracks">曲目列表</h3><span>01—09 / RINLU</span></div>
-      <ol class="track-list" id="track-list" aria-label="RINLU tracks"></ol>
-      <div class="single-section"><div><span class="pill">SINGLE / 单曲</span><h3 data-i18n="singleTitle">大半辈子都在外面啦！</h3></div><p data-i18n="singleComing">更多音乐，陆续到站。</p></div>
-    </section>
-
-    <section class="about-section section-shell" id="about"><div class="about-art"><img src="/assets/rinlu-memories.webp" alt="RINLU 的旅行记忆拼贴" width="1254" height="1254" loading="lazy"/><span class="about-caption">MORE MEMORIES, MORE MUSIC.</span></div><div class="about-copy"><p class="section-index">02 / THIS IS RINLU</p><h2><span data-i18n="aboutLine1">认真做梦，</span><br/><span data-i18n="aboutLine2">慢慢长大。</span></h2><p data-i18n="aboutP1">RINLU 是一个装着好奇心的音乐小宇宙。那些突然冒出来的问题、不想藏起来的小情绪，还有日常里的灵光一闪，都可以变成歌。</p><p data-i18n="aboutP2">只要可爱，什么风格都可以试试。带着一点淘气、一点柔软，去发现音乐的各种可能。</p><div class="note-box"><span>✳</span><div><strong data-i18n="imagination">小小奇思妙想</strong><small data-i18n="aiNote">创作记录：词句与故事来自日常观察，音乐制作包含 AI 辅助创作。</small></div></div></div></section>
-    <section class="next-section section-shell" id="next"><p class="section-index">03 / TO BE CONTINUED</p><span class="giant-spark" aria-hidden="true">✳</span><h2><span data-i18n="nextLine1">还有一些惊喜，</span><br/><span data-i18n="nextLine2">正在悄悄发生。</span></h2><p data-i18n="nextP">RINLU 的小小世界，还藏着一些没说完的故事。等时机刚好，再慢慢告诉你。</p><span class="pill" data-i18n="stayTuned">先留一点好奇。</span></section>
-    <section class="cta-section section-shell"><p class="eyebrow">PRESS PLAY, FIND YOUR LITTLE WORLD.</p><h2 data-i18n="ctaTitle">今天，想听点什么？</h2><p data-i18n="ctaSubtitle">在你喜欢的平台，遇见 RINLU。</p><div class="platforms"><a href="https://music.163.com/#/album?id=3975655200" target="_blank" rel="noopener noreferrer"><strong>网易云音乐</strong><span data-i18n="netEase">前往同名专辑 ↗</span></a><a href="https://open.spotify.com/album/0p4NkW11vsliBfYhaqOZvE" target="_blank" rel="noopener noreferrer"><strong>Spotify</strong><span data-i18n="spotify">前往同名专辑 ↗</span></a><a href="https://www.qobuz.com/us-en/album/rinlu-rinlu/zntpy4lhd74th" target="_blank" rel="noopener noreferrer"><strong>Qobuz</strong><span data-i18n="qobuz">前往 RINLU 专辑 ↗</span></a></div><small data-i18n="availability">各平台上线时间及可播放内容以平台页面为准。</small></section>
-  </main>
-  <footer class="site-footer section-shell"><a class="wordmark" href="#top">RINLU<span class="asterisk">✳</span></a><span>A LITTLE WORLD OF MUSIC</span><span>© 2026 RINLU</span><a href="#top" data-i18n="backTop">回到顶部 ↑</a></footer>
-</body>
-</html>
+<a class="skip" href="#main">跳到主要内容</a>
+<header class="header"><a class="logo" href="#" aria-label="RINLU 首页">RINLU<span>✳</span></a><nav aria-label="主导航"><a href="#music">音乐</a><a href="#about">关于 RINLU</a><a href="#next">未完待续</a></nav><a class="nav-listen" href="https://music.163.com/#/album?id=397565520" target="_blank" rel="noopener noreferrer">去听歌 <span aria-hidden="true">↗</span></a><div class="language-switch" role="group" aria-label="语言切换"><a href="index.html" lang="zh-CN" hreflang="zh-CN" aria-current="page">中文</a><a href="en.html" lang="en" hreflang="en">EN</a><a href="ja.html" lang="ja" hreflang="ja">日本語</a></div></header>
+<main id="main">
+<section class="hero" aria-labelledby="hero-title"><div class="hero-copy"><div class="eyebrow">A LITTLE WORLD OF MUSIC</div><h1 id="hero-title">小小世界，<br>大声<span class="blue">喜欢。</span></h1><p>把奇思妙想唱成歌，<br>把平凡日子过成小小的冒险。</p><a class="button dark" href="https://music.163.com/#/album?id=397565520" target="_blank" rel="noopener noreferrer"><span aria-hidden="true">▶</span> 走进 RINLU 的音乐世界</a><div class="hero-bottom"><span>好奇心，不设音量上限。</span><a href="#music" aria-label="向下探索音乐">↓</a></div></div><div class="hero-art"><img src="/assets/rinlu-hero.webp" alt="RINLU 双丸子头女孩背着熊猫挂件背包，在明亮的机场回头挥手" width="1254" height="1254" fetchpriority="high"><div class="image-caption"><span>HELLO, I'M</span><strong>RINLU</strong><span>下一站，开心。</span></div><div class="sticker">带上耳朵<br>一起出发！</div></div></section>
+<div class="ticker" aria-hidden="true"><span>STAY CURIOUS ✳</span><span>慢慢发光 ✳</span><span>MAKE SOME JOY ✳</span><span>认真做梦 ✳</span><span>STAY CURIOUS ✳</span></div>
+<section id="music" class="music section"><div class="section-heading"><div><div class="eyebrow">01 / THE MUSIC</div><h2>给生活，加一点旋律。</h2></div><span class="label">THE FIRST ALBUM · 09 TRACKS</span></div><div class="album-layout"><div class="album-info"><img class="album-cover" src="/assets/rinlu-album.webp" alt="RINLU 同名专辑封面：女孩抱着白猫，在蓝天与花朵间微笑" width="1254" height="1254" loading="lazy"><div class="album-type">同名专辑</div><h3>RINLU<span>✳</span></h3><p>九首歌，九种小小心情。<br>有好奇，有勇气，也有慢慢长大的温度。</p><div class="release">发行计划 <time datetime="2026-09-26">2026.09.26</time></div><a class="text-link" href="https://music.163.com/#/album?id=397565520" target="_blank" rel="noopener noreferrer">在网易云音乐收听专辑 ↗</a><div class="album-note">世界有速度，<br>我有温度。</div></div><ol class="tracks"><li><span class="number">01</span><div><h4>小小宇宙转啊转</h4><span>把问题排成队，带它们一起出发。</span></div><a class="track-link" href="https://music.163.com/#/song?id=3434331498" target="_blank" rel="noopener noreferrer" aria-label="在网易云音乐收听《小小宇宙转啊转》">↗</a></li><li><span class="number">02</span><h4>今日份小奇迹</h4><a class="track-link" href="https://music.163.com/#/song?id=3434787873" target="_blank" rel="noopener noreferrer" aria-label="在网易云音乐收听《今日份小奇迹》">↗</a></li><li><span class="number">03</span><h4>转个身明天就到</h4><a class="track-link" href="https://music.163.com/#/song?id=3434798925" target="_blank" rel="noopener noreferrer" aria-label="在网易云音乐收听《转个身明天就到》">↗</a></li><li><span class="number">04</span><h4>热热闹闹向前闯</h4><a class="track-link" href="https://music.163.com/#/song?id=3434846056" target="_blank" rel="noopener noreferrer" aria-label="在网易云音乐收听《热热闹闹向前闯》">↗</a></li><li><span class="number">05</span><h4>左边画个虫虫 <small>REMIX</small></h4><a class="track-link" href="https://music.163.com/#/song?id=3435777154" target="_blank" rel="noopener noreferrer" aria-label="在网易云音乐收听《左边画个虫虫 REMIX》">↗</a></li><li><span class="number">06</span><h4>慢慢发光</h4><a class="track-link" href="https://music.163.com/#/song?id=3436729063" target="_blank" rel="noopener noreferrer" aria-label="在网易云音乐收听《慢慢发光》">↗</a></li><li><span class="number">07</span><h4>糖果梦不会骗人</h4><a class="track-link" href="https://music.163.com/#/song?id=3436733595" target="_blank" rel="noopener noreferrer" aria-label="在网易云音乐收听《糖果梦不会骗人》">↗</a></li><li><span class="number">08</span><h4>世界有速度，我有温度</h4><a class="track-link" href="https://music.163.com/#/song?id=3436735500" target="_blank" rel="noopener noreferrer" aria-label="在网易云音乐收听《世界有速度，我有温度》">↗</a></li><li><span class="number">09</span><h4>不会？那就学会！</h4><a class="track-link" href="https://music.163.com/#/song?id=3436738590" target="_blank" rel="noopener noreferrer" aria-label="在网易云音乐收听《不会？那就学会！》">↗</a></li></ol></div><div class="standalone-single"><div><span class="eyebrow">SINGLE / 单曲</span><h3>大半辈子都在外面啦！</h3></div><a href="https://music.163.com/#/song?id=3439718844" target="_blank" rel="noopener noreferrer" aria-label="在网易云音乐收听《大半辈子都在外面啦！》">网易云音乐收听 ↗</a></div></section>
+<section id="about" class="about section"><div class="about-art"><img src="/assets/rinlu-memories.webp" loading="lazy" alt="RINLU 戴着太阳镜，与旅行照片和手写便签组成的记忆拼贴" width="1254" height="1254"><span class="photo-label">MORE MEMORIES, MORE MUSIC.</span></div><div class="about-copy"><div class="eyebrow">02 / THIS IS RINLU</div><h2>认真做梦，<br>慢慢长大。</h2><p>RINLU 是一个装着好奇心的音乐小宇宙。那些突然冒出来的问题、不想藏起来的小情绪，还有日常里的灵光一闪，都可以变成歌。</p><p>只要可爱，什么风格都可以试试。带着一点淘气、一点柔软，去发现音乐的各种可能。陪你热热闹闹地向前闯，或安安静静地发光。</p><div class="tags"><span>小小奇思妙想</span></div><p class="creation-note">创作记录：词句与故事来自日常观察，音乐制作包含 AI 辅助创作。</p></div></section>
+<section id="next" class="teaser section"><div><div class="eyebrow">03 / TO BE CONTINUED</div><h2>还有一些惊喜，<br>正在悄悄发生。</h2></div><div class="teaser-copy"><span class="status">新的篇章 · 酝酿中</span><p>RINLU 的小小世界，还藏着一些没说完的故事。<br>等时机刚好，再慢慢告诉你。</p><p class="small">先留一点好奇。</p></div></section>
+<section id="listen" class="listen section"><div class="eyebrow">PRESS PLAY, FIND YOUR LITTLE WORLD.</div><h2>今天，想听点什么？</h2><p>在你喜欢的平台，遇见 RINLU。</p><div class="platforms"><a href="https://music.163.com/#/album?id=397565520" target="_blank" rel="noopener noreferrer"><span><strong>网易云音乐</strong><small>前往同名专辑</small></span><span aria-hidden="true">↗</span></a><a href="https://open.spotify.com/album/0p4NkW11vsliBfYhaqOZvE" target="_blank" rel="noopener noreferrer"><span><strong>Spotify</strong><small>前往同名专辑</small></span><span aria-hidden="true">↗</span></a><a href="https://www.qobuz.com/us-en/album/rinlu-rinlu/zntpy4lhd74th" target="_blank" rel="noopener noreferrer"><span><strong>Qobuz</strong><small>前往同名专辑</small></span><span aria-hidden="true">↗</span></a></div><span class="availability">各平台上线时间及可播放内容以平台页面为准。</span></section>
+</main><footer><a class="logo" href="#" aria-label="回到首页">RINLU<span>✳</span></a><span>A LITTLE WORLD OF MUSIC</span><span>© 2026 RINLU</span><a href="#main">回到顶部 ↑</a></footer>
+</body></html>
