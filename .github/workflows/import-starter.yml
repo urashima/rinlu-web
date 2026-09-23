@@ -1,0 +1,59 @@
+name: Import RINLU starter package
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'RINLU_GitHub_Actions_Starter.zip'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: rinlu-import
+  cancel-in-progress: false
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout private repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Verify and unpack supplied site archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive=RINLU_GitHub_Actions_Starter.zip
+          test -f "$archive" || { echo "Upload the ZIP to the repository root first."; exit 1; }
+          test "$(stat -c%s "$archive")" -lt 25000000
+          mkdir -p /tmp/rinlu-import
+          unzip -q "$archive" -d /tmp/rinlu-import
+          test -f /tmp/rinlu-import/site/index.html
+          test -f /tmp/rinlu-import/site/app.js
+          test -f /tmp/rinlu-import/site/styles.css
+          test -f /tmp/rinlu-import/site/assets/rinlu-hero.webp
+          test -f /tmp/rinlu-import/site/assets/rinlu-album.webp
+          test -f /tmp/rinlu-import/site/assets/rinlu-memories.webp
+          test -f /tmp/rinlu-import/Dockerfile
+          test -f /tmp/rinlu-import/ops/bootstrap-ovh.sh
+          # Copy only the intended project files. Preserve workflows maintained in this repo.
+          rsync -a --delete /tmp/rinlu-import/site/ site/
+          rsync -a /tmp/rinlu-import/ops/ ops/
+          for f in Dockerfile nginx.conf deploy.sh check-server.sh README.md SETUP_GITHUB.md .gitignore; do
+            cp "/tmp/rinlu-import/$f" "./$f"
+          done
+          git rm -f -- "$archive"
+      - name: Commit imported site and original image assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add site ops Dockerfile nginx.conf deploy.sh check-server.sh README.md SETUP_GITHUB.md .gitignore
+          if ! git diff --cached --quiet; then
+            git commit -m "Import complete RINLU site and image assets"
+          fi
+          git push
