@@ -43,6 +43,28 @@ jobs:
           test -n "$HOST" && test -n "$USER"
           rsync -az --delete --safe-links --exclude='.git/' --exclude='.github/' -e "ssh -p $PORT -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes" ./ "$USER@$HOST:/home/ubuntu/rinlu-staging/"
 
+      - name: Stage optional RINLU processor secrets
+        env:
+          PROCESSOR: ${{ secrets.RINLU_PROCESSOR_TOKEN }}
+          SITE_ACCESS: ${{ secrets.RINLU_SITES_ACCESS_TOKEN }}
+          HOST: ${{ secrets.OVH_HOST }}
+          USER: ${{ secrets.OVH_USER }}
+          PORT: ${{ vars.OVH_SSH_PORT || '22' }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$PROCESSOR" || -z "$SITE_ACCESS" ]]; then
+            echo 'Processor secrets are not configured; preserving website-only deployment.'
+            exit 0
+          fi
+          python3 - <<'PY'
+          import os,pathlib
+          values={'RINLU_ORIGIN':'https://sonora-independent-music.kai-ma.chatgpt.site','RINLU_PROCESSOR_TOKEN':os.environ['PROCESSOR'],'RINLU_SITES_ACCESS_TOKEN':os.environ['SITE_ACCESS']}
+          assert all(not any(c in v for c in '\r\n\0') for v in values.values())
+          p=pathlib.Path('/tmp/rinlu-worker.env');p.touch(mode=0o600);p.write_text(''.join(k+'='+v+'\n' for k,v in values.items()))
+          PY
+          trap 'rm -f /tmp/rinlu-worker.env' EXIT
+          scp -P "$PORT" -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes /tmp/rinlu-worker.env "$USER@$HOST:/home/ubuntu/rinlu-worker.env"
+
       - name: Publish site and verify HTTP 80
         env:
           HOST: ${{ secrets.OVH_HOST }}

@@ -34,3 +34,10 @@ docker tag "$IMAGE:$RELEASE" "$IMAGE:current"
 echo 'SUCCESS: RINLU is healthy on http://127.0.0.1:80/ and public TCP/80 (if firewall permits).'
 docker ps --filter "name=^/${NAME}$" --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'
 echo 'VPN ports were not changed. HTTPS/443 is intentionally not configured.'
+
+# Optional processor: configured separately from the website; no incoming ports.
+if [[ -f /home/ubuntu/rinlu-worker.env && ! -L /home/ubuntu/rinlu-worker.env ]]; then
+  install -d -m 700 /etc/rinlu
+  install -o root -g root -m 600 /home/ubuntu/rinlu-worker.env /etc/rinlu/worker.env
+  bash "$DIR/services/ovh/deploy-worker.sh"
+fi

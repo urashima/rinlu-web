@@ -1,0 +1,27 @@
+services:
+  media-worker:
+    build: .
+    restart: unless-stopped
+    init: true
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 2g
+    cpus: 1
+    pids_limit: 64
+    tmpfs:
+      - /tmp:size=256m,mode=1777
+    volumes:
+      - signatures:/var/lib/clamav
+    environment:
+      SONORA_ORIGIN: ${RINLU_ORIGIN:-${SONORA_ORIGIN:-}}
+      SONORA_PROCESSOR_TOKEN: ${RINLU_PROCESSOR_TOKEN:-${SONORA_PROCESSOR_TOKEN:-}}
+      SONORA_SITES_ACCESS_TOKEN: ${RINLU_SITES_ACCESS_TOKEN:-${SONORA_SITES_ACCESS_TOKEN:-}}
+      SONORA_SMTP_HOST: ${SONORA_SMTP_HOST:-}
+      SONORA_SMTP_PORT: ${SONORA_SMTP_PORT:-587}
+      SONORA_SMTP_USER: ${SONORA_SMTP_USER:-}
+      SONORA_SMTP_PASSWORD: ${SONORA_SMTP_PASSWORD:-}
+      SONORA_MAIL_FROM: ${SONORA_MAIL_FROM:-}
+      SONORA_ALERT_WEBHOOK: ${SONORA_ALERT_WEBHOOK:-}
+volumes:
+  signatures:
