@@ -20,6 +20,16 @@ FREE_MB=$(df -Pm / | awk 'NR==2 {print $4}')
 if (( FREE_MB < 6000 )); then echo 'Less than 6 GB free; deployment refused.' >&2; exit 3; fi
 # Build before starting/replacing worker; Compose has no published ports.
 docker compose --project-name rinlu-processor --env-file "$ENV_FILE" -f "$ROOT/services/media-worker/compose.yaml" build
+# Separate offline antivirus check: no production tokens, input files or ports.
+if docker volume inspect rinlu-processor_signatures >/dev/null 2>&1; then
+  docker run --rm --network none --read-only --cap-drop ALL \
+    --security-opt no-new-privileges:true --memory 2g --cpus 1 --pids-limit 64 \
+    --tmpfs /tmp:size=32m,mode=1777 \
+    --mount type=volume,src=rinlu-processor_signatures,dst=/var/lib/clamav,readonly \
+    --entrypoint python3 rinlu-processor-media-worker:latest /app/selftest.py
+else
+  echo 'Scanner self-test deferred until the initial signature volume is ready.'
+fi
 # No other Compose projects, website container or system firewall are modified.
 docker compose --project-name rinlu-processor --env-file "$ENV_FILE" -f "$ROOT/services/media-worker/compose.yaml" up -d --no-build
 printf 'Worker launched. Check processor heartbeat and a real upload before enabling automatic-only review.\n'
