@@ -5,6 +5,7 @@ from email.message import EmailMessage
 from pathlib import Path
 from urllib.parse import urlparse
 from media_validation import audio_stream
+from audio_analysis import analyze_pcm
 
 def setting(key, default=''):
     return os.environ.get('RINLU_'+key, os.environ.get('SONORA_'+key, default))
@@ -91,6 +92,22 @@ def process(job):
         post(job['fail'],{'error':'Malware detected' if infected else str(error)[:500],'scan':'infected' if infected else 'error'},lease)
         print(json.dumps({'job':job['id'],'status':'failed'}),flush=True)
 
+def analyze_rendition(job):
+    try:
+        with tempfile.TemporaryDirectory(prefix='rinlu-analysis-') as directory:
+            source=Path(directory)/'stream.mp3'
+            with request(job['input']) as response:
+                data=response.read(32*1024*1024+1)
+            if len(data)>32*1024*1024: raise ValueError('Rendition too large')
+            source.write_bytes(data)
+            raw=command(['ffmpeg','-nostdin','-v','error','-protocol_whitelist','file,pipe','-i',str(source),'-map','0:a:0','-vn','-ac','1','-ar','8000','-f','s16le','pipe:1'],timeout=240)
+            analysis=analyze_pcm(raw)
+            post(job['complete'],{'hash':job['hash'],'analysis':analysis})
+            print(json.dumps({'job':job['id'],'status':'analysis_complete','version':1}),flush=True)
+    except Exception:
+        post('/api/service/analysis-fail/'+job['id'],{'hash':job['hash']})
+        print(json.dumps({'job':job['id'],'status':'analysis_failed'}),flush=True)
+
 def alert():
     if not ALERT.startswith('https://'): return
     try:
@@ -133,7 +150,10 @@ while not STOP.is_set():
         if STOP.is_set(): break
         job=post('/api/service/claim',{}).get('job')
         if job: process(job)
-        else: STOP.wait(5)
+        else:
+            analysis_job=post('/api/service/analysis-claim',{}).get('job')
+            if analysis_job: analyze_rendition(analysis_job)
+            else: STOP.wait(5)
     except Exception as error:
         # Never log response bodies, signed playback URLs, source paths or keys.
         print(json.dumps({'status':'unavailable','error_type':type(error).__name__}),flush=True)
