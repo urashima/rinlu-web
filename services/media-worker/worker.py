@@ -4,6 +4,7 @@ import json, os, time, tempfile, subprocess, urllib.request, urllib.error, uuid,
 from email.message import EmailMessage
 from pathlib import Path
 from urllib.parse import urlparse
+from media_validation import audio_stream
 
 def setting(key, default=''):
     return os.environ.get('RINLU_'+key, os.environ.get('SONORA_'+key, default))
@@ -75,12 +76,8 @@ def process(job):
                     if size>25*1024*1024: raise RuntimeError('Original exceeds input limit')
                     target.write(chunk)
             scan(source)
-            metadata=json.loads(command(['ffprobe','-v','error','-protocol_whitelist','file,pipe','-show_entries','stream=codec_type,sample_rate,channels:format=duration','-of','json',str(source)]))
-            streams=metadata.get('streams',[]); duration=float(metadata.get('format',{}).get('duration',0))
-            if not 1<=duration<=3600 or not streams or any(s.get('codec_type')!='audio' for s in streams):
-                raise RuntimeError('Expected audio-only recording between one second and one hour')
-            if len(streams)!=1 or int(streams[0].get('channels',0)) not in (1,2):
-                raise RuntimeError('Only mono or stereo audio is supported')
+            metadata=json.loads(command(['ffprobe','-v','error','-protocol_whitelist','file,pipe','-show_entries','stream=codec_type,sample_rate,channels:stream_disposition=attached_pic:format=duration','-of','json',str(source)]))
+            audio_stream(metadata)
             command(['ffmpeg','-nostdin','-v','error','-protocol_whitelist','file,pipe','-i',str(source),'-map','0:a:0','-vn','-map_metadata','-1','-af','loudnorm=I=-16:TP=-1.5:LRA=11','-codec:a','libmp3lame','-b:a','128k','-ar','44100','-ac','2','-id3v2_version','3','-f','mp3',str(output)],timeout=240)
             if output.stat().st_size>32*1024*1024: raise RuntimeError('Rendition exceeds 32 MB; use a shorter recording')
             scan(output)
