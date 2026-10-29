@@ -1,5 +1,5 @@
 """Run in a separate offline container without production credentials or media."""
-import json, subprocess, tempfile
+import json, subprocess, tempfile, errno, sys
 from pathlib import Path
 
 def run(args, expected=0, timeout=90):
@@ -20,5 +20,24 @@ with tempfile.TemporaryDirectory(prefix='rinlu-selftest-') as directory:
     run(['ffprobe','-v','error','-of','json',str(bad)],expected=1)
     missing=root/'no-signatures';missing.mkdir()
     run(['clamscan','--no-summary','--database='+str(missing),str(clean)],expected=2)
+    # Real child-process timeout, killed and reaped without touching production jobs.
+    try:
+        subprocess.run([sys.executable,'-c','import time; time.sleep(2)'],timeout=.1,check=True)
+        raise RuntimeError('Timeout guard failed')
+    except subprocess.TimeoutExpired:
+        pass
+    # Deliberately exhaust only this disposable container's 32 MB tmpfs.
+    full=root/'bounded-disk-probe'
+    exhausted=False
+    try:
+        with full.open('wb') as target:
+            for _ in range(40):target.write(b'x'*1024*1024)
+    except OSError as error:
+        if error.errno!=errno.ENOSPC:raise
+        exhausted=True
+    finally:
+        full.unlink(missing_ok=True)
+    if not exhausted:raise RuntimeError('Self-test requires the isolated 32 MB tmpfs')
+    if not root.is_dir():raise RuntimeError('Disposable directory lost')
     version=run(['clamscan','--version']).decode().strip()[:250]
-    print(json.dumps({'status':'isolated_selftest_passed','scanner':version,'checks':['clean_source','ffmpeg_rendition','clean_output','eicar_blocked','damaged_audio_rejected','missing_signatures_fail_closed'],'production_credentials':False,'network':'none'}),flush=True)
+    print(json.dumps({'status':'isolated_selftest_passed','scanner':version,'checks':['clean_source','ffmpeg_rendition','clean_output','eicar_blocked','damaged_audio_rejected','missing_signatures_fail_closed','child_timeout_reaped','isolated_disk_full_recovered'],'production_credentials':False,'network':'none'}),flush=True)

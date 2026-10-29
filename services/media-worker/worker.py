@@ -6,6 +6,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 from media_validation import audio_stream
 from audio_analysis import analyze_pcm
+from mail_delivery import send_notification, permanent_failure
 
 def setting(key, default=''):
     return os.environ.get('RINLU_'+key, os.environ.get('SONORA_'+key, default))
@@ -121,19 +122,10 @@ def deliver_mail():
     item = post('/api/service/mail-claim', {}).get('mail')
     if not item: return
     try:
-        sender=os.environ['SONORA_MAIL_FROM']
-        message=EmailMessage();message['From']=sender;message['To']=item['recipient']
-        message['Subject']='RINLU account notification'
-        message['Message-ID']='<sonora-'+item['id']+'@'+sender.split('@')[-1]+'>'
-        message.set_content(item['message']+'\n\nManage your recordings and notifications at '+ORIGIN)
-        port=int(setting('SMTP_PORT','587'))
-        with smtplib.SMTP(host,port,timeout=30) as smtp:
-            smtp.ehlo();smtp.starttls(context=ssl.create_default_context());smtp.ehlo()
-            if setting('SMTP_USER'):smtp.login(os.environ['SONORA_SMTP_USER'],os.environ['SONORA_SMTP_PASSWORD'])
-            smtp.send_message(message)
+        send_notification(item,ORIGIN,setting)
         post('/api/service/mail-complete',{'id':item['id'],'lease':item['lease']})
-    except Exception:
-        post('/api/service/mail-fail',{'id':item['id'],'lease':item['lease'],'error':'SMTP delivery failed; inspect the configured mail service'})
+    except Exception as error:
+        post('/api/service/mail-fail',{'id':item['id'],'lease':item['lease'],'retryable':not permanent_failure(error),'error':'SMTP delivery failed; inspect the configured mail service'})
 
 STOP=threading.Event()
 signal.signal(signal.SIGTERM,lambda *_:STOP.set())

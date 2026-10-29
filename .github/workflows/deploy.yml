@@ -20,6 +20,13 @@ jobs:
       - name: Check out website
         uses: actions/checkout@v4
 
+      - name: Validate processor before accessing deployment credentials
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s services/media-worker -p 'test_*.py'
+          python3 -m py_compile services/media-worker/worker.py
+          bash -n services/ovh/deploy-worker.sh
+
       - name: Configure verified SSH identity
         env:
           PRIVATE_KEY: ${{ secrets.OVH_SSH_KEY }}
@@ -73,3 +80,4 @@ jobs:
         run: |
           set -euo pipefail
           ssh -p "$PORT" -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes "$USER@$HOST" 'sudo -n /usr/local/sbin/rinlu-publish'
+
