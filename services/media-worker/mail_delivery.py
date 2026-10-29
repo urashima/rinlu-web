@@ -13,7 +13,7 @@ def address(value):
 
 def send_notification(item, origin, setting, smtp=smtplib):
     host=setting('SMTP_HOST');sender=address(setting('MAIL_FROM'));recipient=address(item['recipient'])
-    port=int(setting('SMTP_PORT','587'));mode=setting('SMTP_MODE','tls' if port==465 else 'starttls')
+    port=int(setting('SMTP_PORT','587'));mode=setting('SMTP_MODE') or ('tls' if port==465 else 'starttls')
     if mode not in ('tls','starttls') or not host or not 1<=port<=65535:
         raise ValueError('Configure a TLS SMTP transport')
     message=EmailMessage();message['From']=sender;message['To']=recipient
