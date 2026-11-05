@@ -42,9 +42,17 @@ docker tag "rinlu-web:$RELEASE" rinlu-web:current
 trap - ERR
 echo 'RINLU website and Docker platform /music/ are healthy.'
 docker ps --filter network=rinlu-music --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'
-# Reuse the pre-existing optional worker configuration.
+# Preserve a running processor when its source and configuration did not change.
 if [[ -f /home/ubuntu/rinlu-worker.env && ! -L /home/ubuntu/rinlu-worker.env ]]; then
  install -d -m 700 /etc/rinlu
  install -o root -g root -m 600 /home/ubuntu/rinlu-worker.env /etc/rinlu/worker.env
- bash "$DIR/services/ovh/deploy-worker.sh"
+ PROCESSOR_HASH="$(find "$DIR/services/media-worker" "$DIR/services/ovh" -type f ! -path '*/__pycache__/*' ! -name '*.pyc' -print0 | sort -z | xargs -0 sha256sum | sha256sum | cut -d' ' -f1)"
+ PREVIOUS_HASH="$(cat /etc/rinlu/processor-release.sha256 2>/dev/null || true)"
+ if [[ "$(docker inspect -f '{{.State.Running}}' rinlu-processor-media-worker-1 2>/dev/null || true)" == true && ( -z "$PREVIOUS_HASH" || "$PREVIOUS_HASH" == "$PROCESSOR_HASH" ) ]]; then
+   echo 'Preserving the running processor; this release does not change it.'
+ else
+   bash "$DIR/services/ovh/deploy-worker.sh"
+ fi
+ printf '%s\n' "$PROCESSOR_HASH" > /etc/rinlu/processor-release.sha256
+ chmod 600 /etc/rinlu/processor-release.sha256
 fi

@@ -38,6 +38,8 @@ jobs:
           npm install --global pnpm@11.25.0
           cd .platform-source/rinlu-player-source
           pnpm install --frozen-lockfile
+          node scripts/tests/accounts-integration.mjs
+          node scripts/tests/external-auth-integration.mjs
           node scripts/tests/platform-gateway.test.mjs
           pnpm exec vite build --config deployment/platform/vite.config.mjs
           cd ../..
