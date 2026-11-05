@@ -9,3 +9,5 @@ Each push and manual workflow run publishes the website and current platform. A 
 Docker deployment builds images before replacing containers, checks HTTP routing and the catalog, and restores previous images if checks fail. The platform runs without root, a writable root filesystem, host ports or Docker socket access. Caddy and VPN configuration are managed separately. Login states in memory are invalidated on container restart; listeners can restart sign-in.
 
 Troubleshooting: inspect the Actions deployment run, `docker logs rinlu-platform`, `/music/healthz`, `/music/_release.json`. Never print or commit session cookies, SSH keys, or processor credentials.
+
+Validated canonical source packaging includes pnpm-workspace.yaml and .npmrc so frozen installs retain the exact lockfile policy. Initial Docker release is based on canonical source commit dce3583507c7ff97094a9136bf81a6f856348db3.
