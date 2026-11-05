@@ -13,7 +13,7 @@ await writeFile('.platform-source/release.tar.gz',archive);
 execFileSync('python3',['-c',`import tarfile
 with tarfile.open('.platform-source/release.tar.gz') as t:
  for m in t.getmembers():
-  if not m.name.startswith('rinlu-player-source/') or m.issym() or m.islnk() or m.isdev() or '..' in m.name.split('/'): raise ValueError('Unsafe source archive')
+  if not (m.name == 'rinlu-player-source' and m.isdir() or m.name.startswith('rinlu-player-source/')) or m.issym() or m.islnk() or m.isdev() or '..' in m.name.split('/'): raise ValueError('Unsafe source archive')
  t.extractall('.platform-source',filter='data')`]);
 const source='.platform-source/rinlu-player-source',index=JSON.parse(await readFile(source+'/SOURCE-MANIFEST.json','utf8'));
 for(const [path,sha]of Object.entries(index.files)){if(path.startsWith('/')||path.split('/').includes('..'))throw Error('Unsafe manifest path');if(createHash('sha256').update(await readFile(source+'/'+path)).digest('hex')!==sha)throw Error('Source file checksum mismatch: '+path)}
