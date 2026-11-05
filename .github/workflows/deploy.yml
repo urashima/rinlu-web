@@ -1,9 +1,11 @@
-name: Deploy RINLU to OVH (HTTP 80)
+name: Deploy RINLU website and Docker music platform
 
 on:
   push:
     branches: [main]
   workflow_dispatch:
+  schedule:
+    - cron: "*/5 * * * *"
 
 permissions:
   contents: read
@@ -15,12 +17,35 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     steps:
       - name: Check out website
         uses: actions/checkout@v4
 
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Verify the canonical platform release
+        id: platform
+        run: node scripts/prepare-platform.mjs
+
+      - name: Build the complete platform client and gateway
+        if: steps.platform.outputs.changed == 'true'
+        run: |
+          set -euo pipefail
+          npm install --global pnpm@11.25.0
+          cd .platform-source/rinlu-player-source
+          pnpm install --frozen-lockfile
+          node scripts/tests/platform-gateway.test.mjs
+          pnpm exec vite build --config deployment/platform/vite.config.mjs
+          cd ../..
+          node scripts/package-platform.mjs
+          rm -rf .platform-source
+
       - name: Validate processor before accessing deployment credentials
+        if: steps.platform.outputs.changed == 'true'
         run: |
           set -euo pipefail
           python3 -m unittest discover -s services/media-worker -p 'test_*.py'
@@ -28,6 +53,7 @@ jobs:
           bash -n services/ovh/deploy-worker.sh
 
       - name: Configure verified SSH identity
+        if: steps.platform.outputs.changed == 'true'
         env:
           PRIVATE_KEY: ${{ secrets.OVH_SSH_KEY }}
           KNOWN_HOSTS: ${{ secrets.OVH_KNOWN_HOSTS }}
@@ -41,6 +67,7 @@ jobs:
           chmod 600 ~/.ssh/known_hosts
 
       - name: Upload release
+        if: steps.platform.outputs.changed == 'true'
         env:
           HOST: ${{ secrets.OVH_HOST }}
           USER: ${{ secrets.OVH_USER }}
@@ -48,9 +75,10 @@ jobs:
         run: |
           set -euo pipefail
           test -n "$HOST" && test -n "$USER"
-          rsync -az --delete --safe-links --exclude='.git/' --exclude='.github/' -e "ssh -p $PORT -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes" ./ "$USER@$HOST:/home/ubuntu/rinlu-staging/"
+          rsync -az --delete --safe-links --exclude='.git/' --exclude='.github/' --exclude='.platform-source/' --exclude='node_modules/' -e "ssh -p $PORT -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes" ./ "$USER@$HOST:/home/ubuntu/rinlu-staging/"
 
       - name: Stage optional RINLU processor secrets
+        if: steps.platform.outputs.changed == 'true'
         env:
           PROCESSOR: ${{ secrets.RINLU_PROCESSOR_TOKEN }}
           SITE_ACCESS: ${{ secrets.RINLU_SITES_ACCESS_TOKEN }}
@@ -73,6 +101,7 @@ jobs:
           scp -P "$PORT" -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes /tmp/rinlu-worker.env "$USER@$HOST:/home/ubuntu/rinlu-worker.env"
 
       - name: Publish site and verify HTTP 80
+        if: steps.platform.outputs.changed == 'true'
         env:
           HOST: ${{ secrets.OVH_HOST }}
           USER: ${{ secrets.OVH_USER }}
@@ -81,3 +110,17 @@ jobs:
           set -euo pipefail
           ssh -p "$PORT" -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes "$USER@$HOST" 'sudo -n /usr/local/sbin/rinlu-publish'
 
+
+      - name: Verify public HTTPS platform release
+        if: steps.platform.outputs.changed == 'true'
+        run: |
+          set -euo pipefail
+          curl --fail --retry 5 --retry-delay 3 https://rinlu.com/music/healthz
+          curl --fail --retry 5 https://rinlu.com/music/_release.json > /tmp/rinlu-live-release.json
+          python3 - <<'PY'
+          import json,pathlib
+          expected=json.loads(pathlib.Path('platform-runtime/public/_release.json').read_text())
+          actual=json.loads(pathlib.Path('/tmp/rinlu-live-release.json').read_text())
+          assert actual['source_sha256']==expected['source_sha256'], 'Production release mismatch'
+          print('Both sites synchronized:', actual['source_sha256'])
+          PY
