@@ -39,7 +39,7 @@ def checked(args, timeout=90):
                           check=True, timeout=timeout).stdout
 
 
-def process_sample(source, result, lease, ready=None):
+def process_sample(source, result, expected_lease, ready=None):
     os.setsid()
     # The worker only reads these variables at import. Stub its entire transport.
     os.environ['RINLU_ORIGIN'] = 'https://media-rehearsal.invalid'
@@ -47,8 +47,8 @@ def process_sample(source, result, lease, ready=None):
     os.environ['RINLU_SITES_ACCESS_TOKEN'] = ''
     import worker
 
-    def request(path, data=None, sent_lease=None, content_type='application/json'):
-        if sent_lease != lease:
+    def request(path, data=None, lease=None, content_type='application/json'):
+        if lease != expected_lease:
             raise RuntimeError('Unexpected rehearsal lease')
         if path == JOB['input']:
             return source.open('rb')
@@ -91,7 +91,7 @@ def process_sample(source, result, lease, ready=None):
                 return stdout
 
         worker.command = observe_transcode
-    worker.process({**JOB, 'lease': lease})
+    worker.process({**JOB, 'lease': expected_lease})
 
 
 def stop_group(process):
