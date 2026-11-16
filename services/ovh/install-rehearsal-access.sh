@@ -24,7 +24,7 @@ done
 
 staged=$(mktemp /etc/sudoers.d/.rinlu-media-rehearsal.XXXXXX)
 trap 'rm -f -- "$staged"' EXIT
-printf '%s\n' 'ubuntu ALL=(root) NOPASSWD: /opt/rinlu-media-rehearsal/services/ovh/rehearse-media.sh 6' > "$staged"
+printf '%s\n' 'ubuntu ALL=(root) NOPASSWD: NOSETENV: /opt/rinlu-media-rehearsal/services/ovh/rehearse-media.sh 6' > "$staged"
 chmod 0440 "$staged"
 visudo -cf "$staged"
 mv -T -- "$staged" "$rule"
