@@ -4,6 +4,7 @@ on:
     paths:
       - 'services/media-worker/**'
       - 'services/ovh/rehearse-media.sh'
+      - 'services/ovh/install-rehearsal-access.sh'
       - '.github/workflows/media-rehearsal.yml'
   workflow_dispatch:
 
@@ -16,6 +17,10 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+      - name: Validate the operator scripts
+        run: |
+          bash -n services/ovh/rehearse-media.sh
+          bash -n services/ovh/install-rehearsal-access.sh
       - name: Build the media processor image
         run: docker build --tag rinlu-media-rehearsal services/media-worker
       - name: Run the OVH rehearsal command in the CI sandbox
