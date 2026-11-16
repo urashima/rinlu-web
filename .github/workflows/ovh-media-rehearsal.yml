@@ -1,7 +1,7 @@
 name: OVH media rehearsal
 on:
-  push:
-    branches: [f002b/isolated-worker-rehearsal]
+  pull_request:
+    branches: [main]
     paths: ['.github/workflows/ovh-media-rehearsal.yml']
   workflow_dispatch:
 
@@ -12,6 +12,7 @@ concurrency:
 
 jobs:
   rehearse:
+    if: github.event_name == 'workflow_dispatch' || (github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'f002b/isolated-worker-rehearsal')
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
