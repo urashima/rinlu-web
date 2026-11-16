@@ -127,26 +127,30 @@ def deliver_mail():
     except Exception as error:
         post('/api/service/mail-fail',{'id':item['id'],'lease':item['lease'],'retryable':not permanent_failure(error),'error':'SMTP delivery failed; inspect the configured mail service'})
 
-STOP=threading.Event()
-signal.signal(signal.SIGTERM,lambda *_:STOP.set())
-signal.signal(signal.SIGINT,lambda *_:STOP.set())
-last_maintenance=last_heartbeat=last_update=0
-while not STOP.is_set():
-    try:
-        current=time.time()
-        if current-last_maintenance>60: post('/api/service/maintenance',{});last_maintenance=current
-        deliver_mail()
-        if current-last_update>12*3600:
-            command(['freshclam','--stdout','--config-file=/app/freshclam.conf'],timeout=300);last_update=current
-        if current-last_heartbeat>60: heartbeat();last_heartbeat=current
-        if STOP.is_set(): break
-        job=post('/api/service/claim',{}).get('job')
-        if job: process(job)
-        else:
-            analysis_job=post('/api/service/analysis-claim',{}).get('job')
-            if analysis_job: analyze_rendition(analysis_job)
-            else: STOP.wait(5)
-    except Exception as error:
-        # Never log response bodies, signed playback URLs, source paths or keys.
-        print(json.dumps({'status':'unavailable','error_type':type(error).__name__}),flush=True)
-        alert();STOP.wait(60)
+def main():
+    STOP=threading.Event()
+    signal.signal(signal.SIGTERM,lambda *_:STOP.set())
+    signal.signal(signal.SIGINT,lambda *_:STOP.set())
+    last_maintenance=last_heartbeat=last_update=0
+    while not STOP.is_set():
+        try:
+            current=time.time()
+            if current-last_maintenance>60: post('/api/service/maintenance',{});last_maintenance=current
+            deliver_mail()
+            if current-last_update>12*3600:
+                command(['freshclam','--stdout','--config-file=/app/freshclam.conf'],timeout=300);last_update=current
+            if current-last_heartbeat>60: heartbeat();last_heartbeat=current
+            if STOP.is_set(): break
+            job=post('/api/service/claim',{}).get('job')
+            if job: process(job)
+            else:
+                analysis_job=post('/api/service/analysis-claim',{}).get('job')
+                if analysis_job: analyze_rendition(analysis_job)
+                else: STOP.wait(5)
+        except Exception as error:
+            # Never log response bodies, signed playback URLs, source paths or keys.
+            print(json.dumps({'status':'unavailable','error_type':type(error).__name__}),flush=True)
+            alert();STOP.wait(60)
+
+if __name__ == '__main__':
+    main()
