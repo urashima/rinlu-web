@@ -1,7 +1,7 @@
 plugins { id 'com.android.application' }
 android {
     namespace 'com.rinlu.music'
-    compileSdk 37
+    compileSdk 36
     defaultConfig {
         applicationId 'com.rinlu.music'
         minSdk 26
