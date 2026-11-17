@@ -1,6 +1,6 @@
 # RINLU | Music — OVH Docker deployment
 
-This repository mirrors the current RINLU Music site built with ChatGPT Sites and deploys it to the OVH server through GitHub Actions. The static site includes Chinese, English, and Japanese pages, current album artwork, and platform-specific album and track links.
+GitHub Actions deploys two experiences to OVH. The static artist website serves Chinese, English, and Japanese pages at the root domain. The Docker music platform at `/music/` builds from the canonical ChatGPT Sites release.
 
 ## Scope and safety
 
