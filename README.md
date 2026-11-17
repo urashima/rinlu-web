@@ -56,7 +56,7 @@ To upload a newer release from your computer, use `scp` for the new tarball, ext
 
 ## Site updates and deployment
 
-For music-platform releases, publish the canonical ChatGPT Site first. The existing `.github/workflows/deploy.yml` downloads and verifies its corresponding-source release, builds the Docker platform, and checks the deployed hash at `https://rinlu.com/music/_release.json`. The workflow can run after a push to `main`, through a manual dispatch, or on its hourly schedule. The artist website assets remain in `site/`. To verify a rollout, compare `source_sha256` on OVH with `sha256` in the canonical `/source/manifest.json`.
+For music-platform releases, publish the canonical ChatGPT Site first. The existing `.github/workflows/deploy.yml` downloads and verifies its corresponding-source release, builds the Docker platform, and checks the deployed hash at `https://rinlu.com/music/_release.json`. The workflow can run after a push to `main`, through a manual dispatch, or on its hourly schedule. The artist website assets remain in `site/`. To verify a rollout, compare `source_sha256` on OVH with `sha256` in the canonical `/source/manifest.json`, then confirm that `https://rinlu.com/music/healthz` reports `ok`.
 
 ## HTTPS / 443 phase (separate change)
 
