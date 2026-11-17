@@ -74,6 +74,7 @@ sudo docker logs --tail=100 rinlu-web
 
 ## Content notes
 
+- The music platform serves JPEG cover artwork. Uploaded source artwork from earlier releases is retained in the shared backend for recovery.
 - The music catalog is shared with the canonical platform. Studies in Sound, Vol. 1 and its six bundled demonstration tracks were retired on 2026-11-17.
 - Chinese links point to NetEase Cloud Music, and English and Japanese links point to Spotify.
 - The site has Chinese, English, and Japanese language pages.
