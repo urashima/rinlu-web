@@ -1,0 +1,34 @@
+name: RINLU iOS simulator build
+on:
+  pull_request:
+    paths:
+      - 'ios/**'
+      - '.github/workflows/ios-ci.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  simulator-build:
+    runs-on: macos-15
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build RINLU iOS (unsigned Simulator)
+        run: |
+          set -o pipefail
+          xcodebuild -project ios/RINLU.xcodeproj \
+            -scheme RINLU \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath ios/DerivedData \
+            CODE_SIGNING_ALLOWED=NO build
+      - name: Archive Simulator app
+        run: |
+          cd ios/DerivedData/Build/Products/Debug-iphonesimulator
+          zip -qr "$GITHUB_WORKSPACE/RINLU-iOS-Simulator.app.zip" RINLU.app
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rinlu-ios-simulator-app
+          path: RINLU-iOS-Simulator.app.zip
+          retention-days: 14
