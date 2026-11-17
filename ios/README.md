@@ -1,15 +1,34 @@
-# RINLU iOS v0.1.0 — Xcode device test project
+# RINLU iOS v0.2.0 — Native audio + Xcode test client
 
-iPhone/iPad equivalent of Android v0.1.0, loading https://rinlu.com/music/ to share accounts, catalog, creator features and web games.
+This iPhone/iPad Xcode project wraps the existing https://rinlu.com/music/
+platform while adding an **AVPlayer-based native playback engine**.
 
-## Build on your iPhone
-1. Open ios/RINLU.xcodeproj in Xcode 15.4 or newer.
-2. In RINLU target > Signing & Capabilities, enable automatic signing and select your Apple Team. Change the bundle ID if necessary.
-3. Connect your iPhone, enable Developer Mode if prompted, choose it as the run destination, then Run.
-4. The source ZIP delivered alongside this branch contains the full-resolution RINLU app icon, derived from the existing Android logo. This repo bootstrap may initially use the generic iOS icon until binary artwork is checked in.
+## Already implemented in iOS source
 
-This uses WKWebView, persistent cookies, trusted-origin routing, native file input, WKDownload export, device rotation, offline retry, and camera/microphone prompts.
-It contains no backend keys and makes no production website changes.
+- AVAudioSession playback category, audio background mode and AVPlayer
+- Now Playing metadata, elapsed position, duration and remote commands
+- Lock screen/Control Center/AirPods/Bluetooth play, pause, next, previous, seek
+- Native music queue and automatic advancement in the background
+- Route-unavailable pause, phone interruption/resume handling
+- Secure first-party WebKit message bridge and native->page state events
+- Existing uploads/downloads, camera/microphone consent, navigation and offline UI
 
-## Not yet feature complete
-Cross-domain auth redirect, background audio and lock screen control, game fullscreen / audio timing, creator upload and admin-role QA need native/device tests. CI tests an unsigned Simulator build; real device signing requires your Apple Team.
+## Build on an iPhone
+
+1. Open `ios/RINLU.xcodeproj` with a current Xcode.
+2. Choose target RINLU > Signing & Capabilities > Automatically manage
+   signing; choose your Apple Team and change bundle identifier if necessary.
+3. Connect an iPhone (enable Developer Mode if requested), select it,
+   then press Run. Simulator CI does not sign a real-device build.
+
+## Important integration boundary
+
+The authoritative website player is managed by ChatGPT Sites and is not
+contained in this mirror repository. Read `WEB_PLAYER_INTEGRATION.md`
+before claiming the actual website streams use the native player.
+Without the website-side handoff, its HTML/WebAudio music is still on the
+existing web pathway and is not guaranteed to play in the background.
+Real-device testing and approval are still required.
+
+No production environment is changed by this feature branch.
+There are no backend credentials or signing private keys in this repository.

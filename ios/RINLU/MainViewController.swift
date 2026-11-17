@@ -8,12 +8,23 @@ final class MainViewController: UIViewController, WKNavigationDelegate, WKUIDele
     private static let home = URL(string: "https://rinlu.com/music/")!
     private let ink = UIColor(red: 17 / 255, green: 17 / 255, blue: 17 / 255, alpha: 1)
 
+    // AVPlayer remains the sole audio transport when the site opts into native playback.
+    private lazy var nativeAudio = NativeAudioPlayer { [weak self] state in
+        self?.emitNativeAudioState(state)
+    }
+
     private lazy var webView: WKWebView = {
         let configuration = WKWebViewConfiguration()
         configuration.websiteDataStore = .default() // persistent first-party cookies
         configuration.allowsInlineMediaPlayback = true
         configuration.mediaTypesRequiringUserActionForPlayback = .all
         configuration.defaultWebpagePreferences.allowsContentJavaScript = true
+        let scripts = WKUserContentController()
+        scripts.add(WeakNativeAudioScriptHandler(receiver: self), name: "rinluNativeAudio")
+        scripts.addUserScript(WKUserScript(source: NativeAudioBridge.javascript,
+                                          injectionTime: .atDocumentStart,
+                                          forMainFrameOnly: true))
+        configuration.userContentController = scripts
 
         let view = WKWebView(frame: .zero, configuration: configuration)
         view.navigationDelegate = self
@@ -41,6 +52,7 @@ final class MainViewController: UIViewController, WKNavigationDelegate, WKUIDele
         view.backgroundColor = ink
         configureLayout()
         configureOfflineOverlay()
+        _ = nativeAudio // register system media controls before the first song
         progressObservation = webView.observe(\.estimatedProgress, options: [.initial, .new]) { [weak self] observed, _ in
             DispatchQueue.main.async {
                 self?.progressBar.progress = Float(observed.estimatedProgress)
@@ -124,6 +136,25 @@ final class MainViewController: UIViewController, WKNavigationDelegate, WKUIDele
         ])
     }
 
+    // The canonical site uses window.RINLUNativeAudio; never accept messages
+    // from an iframe, another scheme or a different origin.
+    func didReceiveNativeAudioCommand(_ message: WKScriptMessage) {
+        guard message.name == "rinluNativeAudio",
+              message.frameInfo.isMainFrame,
+              message.frameInfo.securityOrigin.protocol.lowercased() == "https",
+              message.frameInfo.securityOrigin.host.lowercased() == "rinlu.com",
+              let payload = message.body as? [String: Any] else { return }
+        nativeAudio.handle(payload)
+    }
+
+    private func emitNativeAudioState(_ state: [String: Any]) {
+        guard let url = webView.url, isRinluOrigin(url),
+              JSONSerialization.isValidJSONObject(state),
+              let data = try? JSONSerialization.data(withJSONObject: state),
+              let json = String(data: data, encoding: .utf8) else { return }
+        webView.evaluateJavaScript("window.__rinluNativeAudioUpdate?.(\(json));", completionHandler: nil)
+    }
+
     private func loadHome() {
         webView.load(URLRequest(url: Self.home, cachePolicy: .useProtocolCachePolicy))
     }
@@ -191,6 +222,7 @@ final class MainViewController: UIViewController, WKNavigationDelegate, WKUIDele
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         offlineOverlay.isHidden = true
         loadingView.stopAnimating()
+        emitNativeAudioState(nativeAudio.snapshot())
     }
 
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {

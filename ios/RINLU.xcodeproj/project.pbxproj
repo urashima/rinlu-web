@@ -4,6 +4,12 @@
     classes = {};
     objectVersion = 56;
     objects = {
+        ABCD0000000000000000001A /* NativeAudioPlayer.swift in Sources */ = {
+            isa = PBXBuildFile; fileRef = ABCD00000000000000000018 /* NativeAudioPlayer.swift */;
+        };
+        ABCD0000000000000000001B /* NativeAudioBridge.swift in Sources */ = {
+            isa = PBXBuildFile; fileRef = ABCD00000000000000000019 /* NativeAudioBridge.swift */;
+        };
         ABCD0000000000000000000E /* AppDelegate.swift in Sources */ = {
             isa = PBXBuildFile; fileRef = ABCD00000000000000000007 /* AppDelegate.swift */;
         };
@@ -15,6 +21,12 @@
         };
         ABCD00000000000000000011 /* Assets.xcassets in Resources */ = {
             isa = PBXBuildFile; fileRef = ABCD00000000000000000006 /* Assets.xcassets */;
+        };
+        ABCD00000000000000000018 /* NativeAudioPlayer.swift */ = {
+            isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeAudioPlayer.swift; sourceTree = "<group>";
+        };
+        ABCD00000000000000000019 /* NativeAudioBridge.swift */ = {
+            isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeAudioBridge.swift; sourceTree = "<group>";
         };
         ABCD00000000000000000007 /* AppDelegate.swift */ = {
             isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>";
@@ -48,6 +60,8 @@
                 ABCD00000000000000000007 /* AppDelegate.swift */,
                 ABCD00000000000000000008 /* SceneDelegate.swift */,
                 ABCD00000000000000000009 /* MainViewController.swift */,
+                ABCD00000000000000000018 /* NativeAudioPlayer.swift */,
+                ABCD00000000000000000019 /* NativeAudioBridge.swift */,
                 ABCD0000000000000000000A /* Info.plist */,
                 ABCD00000000000000000006 /* Assets.xcassets */,
             );
@@ -67,6 +81,8 @@
                 ABCD0000000000000000000E /* AppDelegate.swift in Sources */,
                 ABCD0000000000000000000F /* SceneDelegate.swift in Sources */,
                 ABCD00000000000000000010 /* MainViewController.swift in Sources */,
+                ABCD0000000000000000001A /* NativeAudioPlayer.swift in Sources */,
+                ABCD0000000000000000001B /* NativeAudioBridge.swift in Sources */,
             );
             runOnlyForDeploymentPostprocessing = 0;
         };
@@ -165,7 +181,7 @@
                 INFOPLIST_FILE = RINLU/Info.plist;
                 IPHONEOS_DEPLOYMENT_TARGET = 16.0;
                 LD_RUNPATH_SEARCH_PATHS = ("$(inherited)", "@executable_path/Frameworks");
-                MARKETING_VERSION = 0.1.0;
+                MARKETING_VERSION = 0.2.0;
                 PRODUCT_BUNDLE_IDENTIFIER = com.rinlu.music;
                 PRODUCT_NAME = "$(TARGET_NAME)";
                 SDKROOT = iphoneos;
@@ -184,7 +200,7 @@
                 INFOPLIST_FILE = RINLU/Info.plist;
                 IPHONEOS_DEPLOYMENT_TARGET = 16.0;
                 LD_RUNPATH_SEARCH_PATHS = ("$(inherited)", "@executable_path/Frameworks");
-                MARKETING_VERSION = 0.1.0;
+                MARKETING_VERSION = 0.2.0;
                 PRODUCT_BUNDLE_IDENTIFIER = com.rinlu.music;
                 PRODUCT_NAME = "$(TARGET_NAME)";
                 SDKROOT = iphoneos;
