@@ -1,0 +1,63 @@
+name: RINLU iOS simulator and device builds
+on:
+  pull_request:
+    paths:
+      - 'ios/**'
+      - '.github/workflows/ios-ci.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  native-audio-build:
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify background audio entitlement and project
+        run: |
+          plutil -lint ios/RINLU/Info.plist
+          python3 - <<'PY'
+          import plistlib
+          with open('ios/RINLU/Info.plist', 'rb') as f:
+              p = plistlib.load(f)
+          assert 'audio' in p['UIBackgroundModes'], 'missing background audio mode'
+          print('Background audio mode: OK')
+          PY
+      - name: Build RINLU iOS (unsigned Simulator)
+        run: |
+          set -o pipefail
+          xcodebuild -project ios/RINLU.xcodeproj \
+            -scheme RINLU \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath ios/DerivedData \
+            CODE_SIGNING_ALLOWED=NO build
+      - name: Archive Simulator app
+        run: |
+          cd ios/DerivedData/Build/Products/Debug-iphonesimulator
+          zip -qr "$GITHUB_WORKSPACE/RINLU-iOS-Simulator.app.zip" RINLU.app
+      - name: Build RINLU iOS (unsigned physical device target)
+        run: |
+          set -o pipefail
+          xcodebuild -project ios/RINLU.xcodeproj \
+            -scheme RINLU \
+            -configuration Debug \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath ios/DerivedData \
+            CODE_SIGNING_ALLOWED=NO build
+      - name: Package Xcode project source
+        run: |
+          zip -qr RINLU-iOS-v0.2.0-Xcode-source.zip ios \
+            -x 'ios/DerivedData/*' 'ios/**/xcuserdata/*' 'ios/**/.DS_Store'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rinlu-ios-simulator-app
+          path: RINLU-iOS-Simulator.app.zip
+          retention-days: 14
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rinlu-ios-v0.2.0-xcode-source
+          path: RINLU-iOS-v0.2.0-Xcode-source.zip
+          retention-days: 30
