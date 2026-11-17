@@ -56,7 +56,7 @@ To upload a newer release from your computer, use `scp` for the new tarball, ext
 
 ## Site updates and deployment
 
-When the RINLU site is updated in ChatGPT Sites, mirror the latest exported pages and assets into `site/` and commit them to `main`. The existing `.github/workflows/deploy.yml` then publishes the commit to OVH automatically. The repository workflow is the path from the Sites content to the live `rinlu.com` deployment.
+For music-platform releases, publish the canonical ChatGPT Site first. The existing `.github/workflows/deploy.yml` downloads and verifies its corresponding-source release, builds the Docker platform, and checks the deployed hash at `https://rinlu.com/music/_release.json`. The workflow can run after a push to `main`, through a manual dispatch, or on its hourly schedule. The artist website assets remain in `site/`.
 
 ## HTTPS / 443 phase (separate change)
 
