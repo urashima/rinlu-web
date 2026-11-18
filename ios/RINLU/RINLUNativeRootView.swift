@@ -34,7 +34,7 @@ struct RINLUNativeRootView: View {
     var body: some View {
         TabView {
             page("Home") {
-                if let song = store.catalog.first {
+                if !store.catalog.isEmpty {
                     Section {
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(alignment: .top,spacing: 16) {
@@ -45,12 +45,12 @@ struct RINLUNativeRootView: View {
                                             Text(item.title).font(.headline).lineLimit(1)
                                             Text(item.artist).font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
                                         }.frame(width:188,alignment:.leading)
-                                    }.buttonStyle(.plain)
+                                    }.buttonStyle(.plain).accessibilityIdentifier("featuredSong")
                                 }
                             }.padding(.vertical,6)
                         }.listRowInsets(EdgeInsets()).accessibilityIdentifier("releaseShelf")
                     } header: { Text("New recordings") }
-                    Section("Songs") { rows(store.catalog, current: song.id) }
+                    Section("Songs") { rows(store.catalog) }
                 } else { empty(store.busy ? "Loading music…" : "No recordings available") }
             }.tabItem { Label("Home",systemImage:"house.fill") }
             page("Search") {
@@ -115,7 +115,7 @@ struct RINLUNativeRootView: View {
                         HStack { Cover(song:song).frame(width:42,height:42).clipShape(RoundedRectangle(cornerRadius:6))
                             VStack(alignment:.leading){Text(song.title).font(.subheadline.bold());Text(song.artist).font(.caption).foregroundStyle(.secondary)}.lineLimit(1)
                             Spacer() }.contentShape(Rectangle())
-                    }.buttonStyle(.plain)
+                    }.buttonStyle(.plain).accessibilityIdentifier("openPlayer")
                     if audio.loading { ProgressView() }
                     Button { audio.toggle() } label: { Image(systemName:audio.playing ? "pause.fill":"play.fill").frame(width:44,height:44) }.accessibilityLabel(audio.playing ? "Pause":"Play")
                     Button { Task { await audio.next() } } label: { Image(systemName:"forward.fill").frame(width:44,height:44) }.accessibilityLabel("Next song").disabled(!audio.hasNext)
@@ -123,7 +123,7 @@ struct RINLUNativeRootView: View {
             } }
         }
     }
-    private func rows(_ songs:[RINLUSong],current:String?=nil)->some View {
+    private func rows(_ songs:[RINLUSong])->some View {
         ForEach(songs){song in
             Button { Task { await audio.play(song,queue:songs) } } label: {
                 HStack(spacing:12){Cover(song:song).frame(width:48,height:48).clipShape(RoundedRectangle(cornerRadius:7))

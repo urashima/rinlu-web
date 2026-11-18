@@ -78,7 +78,7 @@ struct BusinessPage: UIViewControllerRepresentable {
     func close(){web.stopLoading();web.configuration.userContentController.removeScriptMessageHandler(forName:"transport");web.navigationDelegate=nil}
     func userContentController(_ userContentController:WKUserContentController,didReceive message:WKScriptMessage){
         guard message.frameInfo.isMainFrame,message.frameInfo.securityOrigin.host=="rinlu.com",message.frameInfo.securityOrigin.protocol=="https",let payload=message.body as? [String:Any] else{return}
-        if let id=payload["song"] as? String, UUID(uuidString:id) != nil {onMusic?(id)}
+        if let id=payload["song"] as? String, (1...100).contains(id.count), id.allSatisfy({ $0.isLetter || $0.isNumber || $0 == "-" || $0 == "_" }) {onMusic?(id)}
         else if payload["preview"] as? Bool == true {onPreview?()}
     }
     func webView(_ webView:WKWebView,decidePolicyFor action:WKNavigationAction,decisionHandler:@escaping(WKNavigationActionPolicy)->Void){

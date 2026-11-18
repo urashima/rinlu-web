@@ -4,6 +4,17 @@
     classes = {};
     objectVersion = 56;
     objects = {
+ DBCD00000000000000000001 = {isa = PBXNativeTarget; name = RINLUUITests; productName = RINLUUITests; productType = "com.apple.product-type.bundle.ui-testing"; productReference = DBCD00000000000000000008; buildConfigurationList = DBCD00000000000000000002; buildPhases = (DBCD00000000000000000005,); buildRules = (); dependencies = (DBCD00000000000000000009,);};
+ DBCD00000000000000000002 = {isa = XCConfigurationList; buildConfigurations = (DBCD00000000000000000003,DBCD00000000000000000004,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release;};
+ DBCD00000000000000000005 = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (DBCD00000000000000000006,); runOnlyForDeploymentPostprocessing = 0;};
+ DBCD00000000000000000006 = {isa = PBXBuildFile; fileRef = DBCD00000000000000000007;};
+ DBCD00000000000000000007 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/ListeningUITests.swift; sourceTree = SOURCE_ROOT;};
+ DBCD00000000000000000008 = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; path = RINLUUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR;};
+ DBCD00000000000000000009 = {isa = PBXTargetDependency;target = ABCD00000000000000000002; targetProxy = DBCD0000000000000000000A;};
+ DBCD0000000000000000000A = {isa = PBXContainerItemProxy; containerPortal = ABCD00000000000000000001; proxyType = 1; remoteGlobalIDString = ABCD00000000000000000002; remoteInfo = RINLU;};
+DBCD00000000000000000003 = {isa = XCBuildConfiguration;name = Debug;buildSettings = {GENERATE_INFOPLIST_FILE = YES; PRODUCT_BUNDLE_IDENTIFIER = com.rinlu.music.uitests; PRODUCT_NAME = "$(TARGET_NAME)"; TEST_TARGET_NAME = RINLU; IPHONEOS_DEPLOYMENT_TARGET = 16.0; TARGETED_DEVICE_FAMILY = "1,2"; };};
+DBCD00000000000000000004 = {isa = XCBuildConfiguration;name = Release;buildSettings = {GENERATE_INFOPLIST_FILE = YES; PRODUCT_BUNDLE_IDENTIFIER = com.rinlu.music.uitests; PRODUCT_NAME = "$(TARGET_NAME)"; TEST_TARGET_NAME = RINLU; IPHONEOS_DEPLOYMENT_TARGET = 16.0; TARGETED_DEVICE_FAMILY = "1,2"; };};
+
         ABCD0000000000000000001A /* RINLUTap.h in Sources */ = {
             isa = PBXBuildFile; fileRef = ABCD00000000000000000018 /* RINLUTap.h */;
         };
@@ -79,7 +90,7 @@
         };
         ABCD00000000000000000004 /* Products */ = {
             isa = PBXGroup;
-            children = (ABCD0000000000000000000B /* RINLU.app */,);
+            children = (DBCD00000000000000000008,ABCD0000000000000000000B /* RINLU.app */,);
             name = Products;
             sourceTree = "<group>";
         };
@@ -119,7 +130,7 @@
             productRefGroup = ABCD00000000000000000004 /* Products */;
             projectDirPath = "";
             projectRoot = "";
-            targets = (ABCD00000000000000000002 /* RINLU */,);
+            targets = (DBCD00000000000000000001,ABCD00000000000000000002 /* RINLU */,);
         };
         ABCD00000000000000000002 /* RINLU */ = {
             isa = PBXNativeTarget;
