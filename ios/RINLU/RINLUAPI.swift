@@ -22,7 +22,24 @@ struct RINLUAccount: Decodable {
     let is_owner: Bool?
 }
 struct RINLUMe: Decodable { let user: RINLUAccount? }
-struct RINLUCatalog: Decodable { let tracks: [RINLUSong] }
+struct RINLURelease: Decodable, Identifiable {
+    let id: String
+    let title: String
+    let cover: String?
+    let artist_id: String?
+    let release_date: String?
+    let track_ids: String?
+    var orderedIDs: [String] {
+        guard let track_ids else { return [] }
+        return (try? JSONDecoder().decode([String].self,from:Data(track_ids.utf8))) ?? []
+    }
+}
+struct RINLUArtist: Decodable, Identifiable { let id: String; let name: String }
+struct RINLUCatalog: Decodable {
+    let tracks: [RINLUSong]
+    let releases: [RINLURelease]?
+    let artists: [RINLUArtist]?
+}
 struct RINLUPlaylist: Decodable, Identifiable {
     let id: String
     let name: String
@@ -153,6 +170,8 @@ final class RINLUAPI {
 final class RINLUStore: ObservableObject {
     @Published var account: RINLUAccount?
     @Published var catalog: [RINLUSong] = []
+    @Published var releases = [RINLURelease]()
+    @Published var artists = [RINLUArtist]()
     @Published var favorites: Set<String> = []
     @Published var history: [RINLUSong] = []
     @Published var playlists: [RINLUPlaylist] = []
@@ -166,6 +185,8 @@ final class RINLUStore: ObservableObject {
         do {
             let response: RINLUCatalog = try await RINLUAPI.shared.get("catalog")
             catalog = response.tracks
+            releases = (response.releases ?? []).sorted { ($0.release_date ?? "") > ($1.release_date ?? "") }
+            artists = response.artists ?? []
             error = nil
         } catch { self.error = error.localizedDescription }
         do {

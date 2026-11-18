@@ -4,18 +4,23 @@ import WebKit
 
 extension RINLUSong {
     var artURL: URL? {
+        Self.artURL(cover)
+    }
+    static func artURL(_ cover:String?) -> URL? {
         guard let cover, !cover.isEmpty else { return nil }
         let builtIn = ["dune","solar","tide","plum","orbit","sage"].contains(cover)
         return RINLUAPI.site.appendingPathComponent(builtIn ? "art" : "api/artwork").appendingPathComponent(builtIn ? cover + ".jpg" : cover)
     }
 }
 private struct Cover: View {
-    let song: RINLUSong
+    let url: URL?
+    init(song:RINLUSong) {url=song.artURL}
+    init(cover:String?) {url=RINLUSong.artURL(cover)}
     var body: some View {
         ZStack {
             LinearGradient(colors: [.indigo.opacity(0.78),.pink.opacity(0.55)],startPoint: .topLeading,endPoint: .bottomTrailing)
             Image(systemName: "music.note").foregroundStyle(.white)
-            AsyncImage(url: song.artURL) { image in image.resizable().scaledToFill() } placeholder: { Color.clear }
+            AsyncImage(url: url) { image in image.resizable().scaledToFill() } placeholder: { Color.clear }
         }.aspectRatio(1,contentMode: .fit).clipped().accessibilityHidden(true)
     }
 }
@@ -54,6 +59,10 @@ struct RINLUNativeRootView: View {
                 } else { empty(store.busy ? "Loading music…" : "No recordings available") }
             }.tabItem { Label("Home",systemImage:"house.fill") }
             page("Search") {
+                if !query.isEmpty {
+                    let releases=store.releases.filter { $0.title.localizedCaseInsensitiveContains(query) || artist($0).localizedCaseInsensitiveContains(query) }
+                    if !releases.isEmpty { Section("Albums") {albumRows(releases)} }
+                }
                 if matches.isEmpty { empty("No matching songs") }
                 else { rows(matches) }
             }.searchable(text:$query,prompt:"Songs, artists and genres").tabItem { Label("Search",systemImage:"magnifyingglass") }
@@ -61,6 +70,7 @@ struct RINLUNativeRootView: View {
                 Section {
                     Button { web("settings","Account") } label: { Label(store.account?.name ?? "Sign in or create an account",systemImage:"person.crop.circle") }
                     NavigationLink { List { rows(store.catalog.filter { store.favorites.contains($0.id) }); if store.favorites.isEmpty { empty("No favorites yet") } }.navigationTitle("Favorites") } label: { Label("Favorites",systemImage:"heart") }
+                    NavigationLink { List { albumRows(store.releases); if store.releases.isEmpty {empty("No albums available")} }.navigationTitle("Albums") } label: {Label("Albums",systemImage:"square.stack")}
                     NavigationLink { List { rows(store.history); if store.history.isEmpty { empty("No listening history yet") } }.navigationTitle("Recently played") } label: { Label("Recently played",systemImage:"clock") }
                     Button { web("library","Playlists") } label: { Label("Manage playlists",systemImage:"music.note.list") }
                 }
@@ -121,6 +131,29 @@ struct RINLUNativeRootView: View {
                     Button { Task { await audio.next() } } label: { Image(systemName:"forward.fill").frame(width:44,height:44) }.accessibilityLabel("Next song").disabled(!audio.hasNext)
                 }.padding(.horizontal).padding(.vertical,5).background(.regularMaterial)
             } }
+        }
+    }
+    private func artist(_ release:RINLURelease)->String {
+        store.artists.first { $0.id==release.artist_id }?.name ?? "RINLU"
+    }
+    private func albumRows(_ releases:[RINLURelease])->some View {
+        ForEach(releases){ release in
+            NavigationLink {
+                let tracks=release.orderedIDs.compactMap { id in store.catalog.first { $0.id==id } }
+                List {
+                    VStack(alignment:.leading,spacing:10){
+                        Cover(cover:release.cover).frame(maxWidth:300).clipShape(RoundedRectangle(cornerRadius:12))
+                        Text(artist(release)).font(.title3).foregroundStyle(.secondary)
+                        if let first=tracks.first {
+                            Button {Task{await audio.play(first,queue:tracks)}} label:{Label("Play album",systemImage:"play.fill")}.buttonStyle(.borderedProminent)
+                        }
+                    }
+                    rows(tracks)
+                    Button("View on RINLU"){web("album/"+release.id,release.title)}
+                }.navigationTitle(release.title)
+            } label: {
+                HStack {Cover(cover:release.cover).frame(width:52,height:52).clipShape(RoundedRectangle(cornerRadius:6));VStack(alignment:.leading){Text(release.title);Text(artist(release)).font(.caption).foregroundStyle(.secondary)}}
+            }
         }
     }
     private func rows(_ songs:[RINLUSong])->some View {

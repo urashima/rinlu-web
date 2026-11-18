@@ -42,7 +42,7 @@ static void finish(MTAudioProcessingTapRef tap){delete context(tap);}
 static void prepare(MTAudioProcessingTapRef tap,CMItemCount,const AudioStreamBasicDescription *format){
  auto &c=*context(tap);double fs=format->mSampleRate;
  c.channels=format->mChannelsPerFrame;c.planar=(format->mFormatFlags&kAudioFormatFlagIsNonInterleaved)!=0;
- bool supported=format->mFormatID==kAudioFormatLinearPCM && (format->mFormatFlags&kAudioFormatFlagIsFloat) && format->mBitsPerChannel==32 && (c.channels==1||c.channels==2) && (fs==44100||fs==48000);
+ bool supported=format->mFormatID==kAudioFormatLinearPCM && (format->mFormatFlags&kAudioFormatFlagIsFloat) && format->mBitsPerChannel==32 && c.channels==2 && (fs==44100||fs==48000);
  c.control->unsupported.store(!supported);
  if(supported)c.dsp.reset(new Processor(int(fs),c.control->settings));
  c.blend=0;
