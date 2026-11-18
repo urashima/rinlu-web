@@ -146,7 +146,7 @@ jobs:
           assert '<article id="zh"' in policy and '<article id="en"' in policy, 'Bilingual policy missing'
           assert 'Google' in policy and '隐私政策' in policy, 'Policy content missing'
           assert '/music/privacy-footer.js' in music, 'Music footer injection missing'
-          assert 'data.rinluPrivacyFooter' in footer and '/music/privacy' in footer, 'Music footer script incorrect'
+          assert 'dataset.rinluPrivacyFooter' in footer and '/music/privacy' in footer, 'Music footer script incorrect'
           assert 'href="/music/privacy"' in root, 'Chinese homepage footer link missing'
           assert 'href="/music/privacy?lang=en"' in root_en, 'English homepage footer link missing'
           print('PUBLIC HTTPS VALIDATION PASSED: bilingual privacy and footers')
