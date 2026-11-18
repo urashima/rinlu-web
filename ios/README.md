@@ -1,67 +1,11 @@
-# RINLU iOS v0.3.0 — Native SwiftUI development milestone
-
-This is a **native SwiftUI + SceneKit + AVAudioEngine** client for the existing
-RINLU site and backend. The app entrypoint is `RINLUNativeRootView`; it no longer
-uses a WKWebView as its main UI. The legacy WKWebView host remains in the source
-for migration reference, not as the app root.
-
-## Implemented and CI-compiled
-
-- Native Discover / Search / Your Library / Now Playing / Creator Studio /
-  Administrator list / Music & Play entry screens
-- Real RINLU account **email/password** login through the existing secure
-  `/music/api/accounts/login` cookie session
-- Real catalog, favorites, history, playlists, studio/admin read endpoints
-- Native HTTP-authorized media transfer before every track play; previous
-  five-minute authorization tokens are not cached as queue URLs
-- AVAudioEngine + AVAudioPlayerNode + native EQ/reverb signal graph
-- Native audio session, iOS background mode, MPRemoteCommandCenter and lock
-  screen metadata; interruption handling, headset disconnect pause
-- RINLUDSP **managed listener preset** fetched from `/api/sound/policy`;
-  listener has only a persisted ON/OFF switch
-- Pulse Highway prototype built with SceneKit using the real approved
-  `/api/games/highway/:trackId` level timeline, not demo songs
-- Existing RINLU app icon preserved in the delivered ZIP
-- Verified GitHub Actions macOS iOS Simulator and generic iPhone SDK builds
-
-## Critical incompleteness — do not claim full native parity
-
-1. **RINLUDSP 3.0 NOT ported faithfully yet.** Current AVAudioUnitEQ and
-   AVAudioUnitReverb are an initial native effects path. The original 3.0
-   excitation, plate diffusion, 4x FIR oversampling, compressor, pre-lookahead,
-   dual-channel limiter, convolution and exact latency are **not** implemented.
-   No numeric waveform parity claim is made. See canonical source
-   `docs/RINLUDSP_V3_ARCHITECTURE.md` and AGPL notices.
-2. **Playback waits for an authorized full media download.** Progressive
-   buffered native streaming, signed URL refresh on partial downloads,
-   background network suspension resilience, long-session tests and low-latency
-   song switching need work.
-3. **Playback progress and history:** existing server endpoints are available
-   but current native engine does not yet write optimistic playback state,
-   listened seconds or completed events; actual user history may not update.
-4. Email/password sign-in is available; **Google OAuth/PKCE ASWebAuthenticationSession**
-   with safe native callback is not implemented.
-5. Studio lists are native; upload, release/metadata editors and workflow
-   actions are not yet implemented.
-6. Admin lists are native; moderation, admin accounts and RINLUDSP preset
-   editing/publishing write operations are deliberately not enabled yet.
-7. Game visualization uses approved real levels but is not feature-identical
-   to the full site Pulse Highway engine. Game scoring, calibrated audio clock,
-   timing/difficulty/accessibility need full device QA.
-8. Server-side mobile bootstrap/search patches are in a separate overlay
-   under `services/mobile-api` and have **not** been published to canonical
-   ChatGPT Sites or OVH. The native client currently uses existing live APIs.
-9. No physical-device functional, DSP waveform, audio interruption,
-   Bluetooth/AirPods or release-signature verification has been completed.
-
-## Install on iPhone
-
-Open `ios/RINLU.xcodeproj` in Xcode, choose your Apple Team in
-Signing & Capabilities, connect your iPhone, and press Run. Use an iOS 16+
-device. CI builds are unsigned; no team or signing credentials are in source.
-
-## Production safety
-
-Feature branch only: `feature/rinlu-ios-native-v0.3` and draft PR #5.
-The published website and existing Google login are unchanged.
-Do not merge this branch until all checkboxes in NATIVE_PARITY.md pass.
+# RINLU iOS 0.4
+在 Xcode 打开 RINLU.xcodeproj，选择 RINLU scheme。模拟器直接运行。连接 iPhone 时在 Signing & Capabilities 选择自己的 Team。最低 iOS 16。
+首屏加载正式站曲库，可直接点封面播放。底栏上方的小播放器打开播放页，支持输出设备、队列、歌词及 RINLUDSP 开关。资料库可进入网页歌单、账户、创作者工作室、审核与游戏。
+音频使用 AVURLAsset / AVPlayer 按需读取授权媒体。在 AVAudioMix 上挂接 MTAudioProcessingTap，以原生 C++ 处理 PCM。网站管理的预设 revision、strength 和用户开关进入同一套 DSP。支持 44.1/48 kHz 单声道或立体声浮点输入；其他格式提示原声播放。服务器需支持可渐进解码的媒体，启动时间取决于文件格式和网络。
+算法对照基线为站点提交 e70a57361f876b037c9f2fefb8c64e36f873d134。Tests/reference 中的 JavaScript 仅用于桌面对照测试，不进入 App。使用 C++17 和 Node 运行：
+```bash
+c++ -O2 -std=c++17 -ffp-contract=off Tests/render.cpp -o /tmp/rinlu-compare
+node Tests/compare.mjs /tmp/rinlu-compare
+```
+账户支持站内会话。网页版 Google 登录跳到系统浏览器后，尚需服务端一次性授权码回传才能接续 App 会话。工作室审核原件、本地上传试听、游戏保留网页媒体时钟；开始试听时暂停主播放器。公开歌曲通过原生授权地址播放，网页转交曲目 ID。
+详见 DEVELOPMENT_PLAN.md 中的真机验收项。未附签名证书或 IPA。核心处理及其修改记录见 Licenses。

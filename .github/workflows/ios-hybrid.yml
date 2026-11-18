@@ -1,0 +1,23 @@
+name: RINLU hybrid iOS
+on:
+  push:
+    branches: ['feature/rinlu-ios-hybrid-v0.4']
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 18
+    defaults:
+      run:
+        working-directory: ios
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compare native samples
+        run: |
+          c++ -O2 -std=c++17 -ffp-contract=off Tests/render.cpp -o /tmp/rinlu-compare
+          node Tests/compare.mjs /tmp/rinlu-compare
+      - name: Build for Simulator
+        run: xcodebuild -quiet -project RINLU.xcodeproj -scheme RINLU -configuration Debug -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build
+      - name: Build for iPhone
+        run: xcodebuild -quiet -project RINLU.xcodeproj -scheme RINLU -configuration Release -destination 'generic/platform=iOS' CODE_SIGNING_ALLOWED=NO build

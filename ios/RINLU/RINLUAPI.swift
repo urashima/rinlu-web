@@ -40,7 +40,8 @@ struct RINLUAuthorizedMedia: Decodable {
     let url: String
     let expires_at: Double
 }
-struct RINLUDSPSettings: Decodable {
+struct RINLUDSPSettings: Codable {
+    let q, balance, normalization, harmonics, warmth, deesser, crossfeed, decay, pan: Double?
     let quality: String
     let bands: Int
     let gains: [Float]
@@ -171,28 +172,15 @@ final class RINLUAPI {
     func authorize(trackID: String) async throws -> URL {
         let data: RINLUAuthorizedMedia = try await post("playback/authorize",
                                                         payload: ["track_id": trackID])
-        let url = URL(string: data.url, relativeTo: Self.site)?.absoluteURL
+        let path = data.url.hasPrefix("/api/") ? String(data.url.dropFirst()) : data.url
+        let url = URL(string: path, relativeTo: Self.site)?.absoluteURL
         guard let url = url, url.scheme == "https", url.host == "rinlu.com",
               data.expires_at > Date().timeIntervalSince1970 * 1000 else {
             throw RINLUServiceError.invalidMediaURL
         }
         return url
     }
-    func mediaDownload(_ url: URL) async throws -> URL {
-        // URLSession and the website gateway share the native account cookie;
-        // authenticated bytes are never persisted in public storage.
-        let (location, response) = try await session.download(from: url)
-        guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode),
-              (response.mimeType?.hasPrefix("audio/") ?? false) else {
-            throw RINLUServiceError.invalidResponse
-        }
-        let temporary = FileManager.default.temporaryDirectory
-            .appendingPathComponent("rinlu-" + UUID().uuidString + ".mp3")
-        try FileManager.default.moveItem(at: location, to: temporary)
-        return temporary
-    }
 }
-
 @MainActor
 final class RINLUStore: ObservableObject {
     @Published var account: RINLUAccount?
@@ -210,16 +198,18 @@ final class RINLUStore: ObservableObject {
         busy = true
         defer { busy = false }
         do {
-            async let catalogRequest: RINLUCatalog = RINLUAPI.shared.get("catalog")
-            async let meRequest: RINLUMe = RINLUAPI.shared.get("me")
-            async let policyRequest: RINLUDSPPolicy = RINLUAPI.shared.get("sound/policy")
-            let result = try await (catalogRequest, meRequest, policyRequest)
-            catalog = result.0.tracks
-            account = result.1.user
-            dspPolicy = result.2
+            let response: RINLUCatalog = try await RINLUAPI.shared.get("catalog")
+            catalog = response.tracks
             error = nil
+        } catch { self.error = error.localizedDescription }
+        do {
+            let me: RINLUMe = try await RINLUAPI.shared.get("me")
+            if me.user?.id != account?.id { favorites = []; history = []; playlists = [] }
+            account = me.user
             if account != nil { await refreshPrivate() }
         } catch { self.error = error.localizedDescription }
+        do { dspPolicy = try await RINLUAPI.shared.get("sound/policy") }
+        catch { self.error = error.localizedDescription }
     }
 
     func refreshPrivate() async {

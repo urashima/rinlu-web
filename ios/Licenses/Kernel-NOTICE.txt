@@ -1,0 +1,18 @@
+RINLUDSP refactored kernel, 2026-11-05.
+Original DSP tutorial and algorithm implementations:
+Copyright (C) 2025 FxSound LLC.
+Contributors: www.theremino.com (2025), where credited by the original sources.
+RINLU refactoring and integration: Copyright 2026 RINLU.
+License: GNU Affero General Public License, version 3 or later.
+Full license: /licenses/AGPL-3.0.txt; corresponding source: /source/rinlu-player-source.tar.gz
+
+Derived from the following pinned AGPL sources, not an independent clean-room implementation:
+https://github.com/fxsound2/fxsound-app at 4383180e02ff435d191f71220e8da41f9fa06951
+web/dsp-tutorial/js/dsp/{sos,controls,aural,lex,wide,maximizer,play}.js
+Original copyright/license notices and source hashes remain in public/audio/fxsound/dsp,
+public/audio/fxsound/UPSTREAM.json and public/licenses/fxsound.txt in the source distribution.
+
+Modifications: ESM dependency registry instead of a shared global; constructor/prototype
+conversion to classes; renamed stage APIs; comments consolidated here; arithmetic order and
+32-bit rounding preserved. Generator: scripts/rebuild-rinlu-kernel.mjs.
+No warranty; see the AGPL license. All covered derivative sources remain under AGPL-3.0-or-later.

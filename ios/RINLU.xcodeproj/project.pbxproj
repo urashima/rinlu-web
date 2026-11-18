@@ -4,11 +4,11 @@
     classes = {};
     objectVersion = 56;
     objects = {
-        ABCD0000000000000000001A /* NativeAudioPlayer.swift in Sources */ = {
-            isa = PBXBuildFile; fileRef = ABCD00000000000000000018 /* NativeAudioPlayer.swift */;
+        ABCD0000000000000000001A /* RINLUTap.h in Sources */ = {
+            isa = PBXBuildFile; fileRef = ABCD00000000000000000018 /* RINLUTap.h */;
         };
-        ABCD0000000000000000001B /* NativeAudioBridge.swift in Sources */ = {
-            isa = PBXBuildFile; fileRef = ABCD00000000000000000019 /* NativeAudioBridge.swift */;
+        ABCD0000000000000000001B /* RINLUTap.mm in Sources */ = {
+            isa = PBXBuildFile; fileRef = ABCD00000000000000000019 /* RINLUTap.mm */;
         };
         ABCD00000000000000000023 /* RINLUAPI.swift in Sources */ = { isa = PBXBuildFile; fileRef = ABCD00000000000000000020 /* RINLUAPI.swift */; };
         ABCD00000000000000000024 /* RINLUMusicEngine.swift in Sources */ = { isa = PBXBuildFile; fileRef = ABCD00000000000000000021 /* RINLUMusicEngine.swift */; };
@@ -22,17 +22,17 @@
         ABCD0000000000000000000F /* SceneDelegate.swift in Sources */ = {
             isa = PBXBuildFile; fileRef = ABCD00000000000000000008 /* SceneDelegate.swift */;
         };
-        ABCD00000000000000000010 /* MainViewController.swift in Sources */ = {
-            isa = PBXBuildFile; fileRef = ABCD00000000000000000009 /* MainViewController.swift */;
+        ABCD00000000000000000010 /* BusinessPage.swift in Sources */ = {
+            isa = PBXBuildFile; fileRef = ABCD00000000000000000009 /* BusinessPage.swift */;
         };
         ABCD00000000000000000011 /* Assets.xcassets in Resources */ = {
             isa = PBXBuildFile; fileRef = ABCD00000000000000000006 /* Assets.xcassets */;
         };
-        ABCD00000000000000000018 /* NativeAudioPlayer.swift */ = {
-            isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeAudioPlayer.swift; sourceTree = "<group>";
+        ABCD00000000000000000018 /* RINLUTap.h */ = {
+            isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RINLUTap.h; sourceTree = "<group>";
         };
-        ABCD00000000000000000019 /* NativeAudioBridge.swift */ = {
-            isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeAudioBridge.swift; sourceTree = "<group>";
+        ABCD00000000000000000019 /* RINLUTap.mm */ = {
+            isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = RINLUTap.mm; sourceTree = "<group>";
         };
         ABCD00000000000000000007 /* AppDelegate.swift */ = {
             isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>";
@@ -40,8 +40,8 @@
         ABCD00000000000000000008 /* SceneDelegate.swift */ = {
             isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>";
         };
-        ABCD00000000000000000009 /* MainViewController.swift */ = {
-            isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainViewController.swift; sourceTree = "<group>";
+        ABCD00000000000000000009 /* BusinessPage.swift */ = {
+            isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BusinessPage.swift; sourceTree = "<group>";
         };
         ABCD0000000000000000000A /* Info.plist */ = {
             isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>";
@@ -65,9 +65,9 @@
             children = (
                 ABCD00000000000000000007 /* AppDelegate.swift */,
                 ABCD00000000000000000008 /* SceneDelegate.swift */,
-                ABCD00000000000000000009 /* MainViewController.swift */,
-                ABCD00000000000000000018 /* NativeAudioPlayer.swift */,
-                ABCD00000000000000000019 /* NativeAudioBridge.swift */,
+                ABCD00000000000000000009 /* BusinessPage.swift */,
+                ABCD00000000000000000018 /* RINLUTap.h */,
+                ABCD00000000000000000019 /* RINLUTap.mm */,
                 ABCD00000000000000000020 /* RINLUAPI.swift */,
                 ABCD00000000000000000021 /* RINLUMusicEngine.swift */,
                 ABCD00000000000000000022 /* RINLUNativeRootView.swift */,
@@ -89,9 +89,8 @@
             files = (
                 ABCD0000000000000000000E /* AppDelegate.swift in Sources */,
                 ABCD0000000000000000000F /* SceneDelegate.swift in Sources */,
-                ABCD00000000000000000010 /* MainViewController.swift in Sources */,
-                ABCD0000000000000000001A /* NativeAudioPlayer.swift in Sources */,
-                ABCD0000000000000000001B /* NativeAudioBridge.swift in Sources */,
+                ABCD00000000000000000010 /* BusinessPage.swift in Sources */,
+                ABCD0000000000000000001B /* RINLUTap.mm in Sources */,
                 ABCD00000000000000000023 /* RINLUAPI.swift in Sources */,
                 ABCD00000000000000000024 /* RINLUMusicEngine.swift in Sources */,
                 ABCD00000000000000000025 /* RINLUNativeRootView.swift in Sources */,
@@ -193,7 +192,11 @@
                 INFOPLIST_FILE = RINLU/Info.plist;
                 IPHONEOS_DEPLOYMENT_TARGET = 16.0;
                 LD_RUNPATH_SEARCH_PATHS = ("$(inherited)", "@executable_path/Frameworks");
-                MARKETING_VERSION = 0.3.0;
+                MARKETING_VERSION = 0.4.0;
+                SWIFT_OBJC_BRIDGING_HEADER = "RINLU/RINLUTap.h";
+                CLANG_CXX_LANGUAGE_STANDARD = "c++17";
+                OTHER_CPLUSPLUSFLAGS = "$(inherited) -ffp-contract=off";
+                OTHER_LDFLAGS = "$(inherited) -framework MediaToolbox";
                 PRODUCT_BUNDLE_IDENTIFIER = com.rinlu.music;
                 PRODUCT_NAME = "$(TARGET_NAME)";
                 SDKROOT = iphoneos;
@@ -212,7 +215,11 @@
                 INFOPLIST_FILE = RINLU/Info.plist;
                 IPHONEOS_DEPLOYMENT_TARGET = 16.0;
                 LD_RUNPATH_SEARCH_PATHS = ("$(inherited)", "@executable_path/Frameworks");
-                MARKETING_VERSION = 0.3.0;
+                MARKETING_VERSION = 0.4.0;
+                SWIFT_OBJC_BRIDGING_HEADER = "RINLU/RINLUTap.h";
+                CLANG_CXX_LANGUAGE_STANDARD = "c++17";
+                OTHER_CPLUSPLUSFLAGS = "$(inherited) -ffp-contract=off";
+                OTHER_LDFLAGS = "$(inherited) -framework MediaToolbox";
                 PRODUCT_BUNDLE_IDENTIFIER = com.rinlu.music;
                 PRODUCT_NAME = "$(TARGET_NAME)";
                 SDKROOT = iphoneos;
