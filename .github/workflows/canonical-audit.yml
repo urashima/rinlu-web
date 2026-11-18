@@ -53,7 +53,7 @@ jobs:
           npm install --global pnpm@11.25.0
           cd .platform-source/rinlu-player-source
           pnpm install --frozen-lockfile
-          pnpm exec tsc --noEmit
+          pnpm exec vite build --config deployment/platform/vite.config.mjs
           node scripts/tests/sound-policy-integration.mjs
       - name: Package patch files for canonical Sites handoff
         run: |
