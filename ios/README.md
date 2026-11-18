@@ -9,3 +9,5 @@ node Tests/compare.mjs /tmp/rinlu-compare
 ```
 账户支持站内会话。网页版 Google 登录跳到系统浏览器后，尚需服务端一次性授权码回传才能接续 App 会话。工作室审核原件、本地上传试听、游戏保留网页媒体时钟；开始试听时暂停主播放器。公开歌曲通过原生授权地址播放，网页转交曲目 ID。
 详见 DEVELOPMENT_PLAN.md 中的真机验收项。未附签名证书或 IPA。核心处理及其修改记录见 Licenses。
+
+追加长信号回归可运行 `node Tests/compare.mjs /tmp/rinlu-compare --long`。逐声道覆盖静音、超过 10 秒的轻声段、大信号瞬态和回落。模拟器交互测试使用正式站公开曲库，因此依赖曲库和媒体服务可用。

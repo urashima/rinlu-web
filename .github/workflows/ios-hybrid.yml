@@ -20,6 +20,7 @@ jobs:
         run: |
           c++ -O2 -std=c++17 -ffp-contract=off Tests/render.cpp -o /tmp/rinlu-compare
           node Tests/compare.mjs /tmp/rinlu-compare
+          node Tests/compare.mjs /tmp/rinlu-compare --long
       - name: Build for Simulator
         run: xcodebuild -quiet -project RINLU.xcodeproj -scheme RINLU -configuration Debug -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build
       - name: Build for iPhone
