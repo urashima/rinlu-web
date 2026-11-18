@@ -1,302 +1,281 @@
-import Foundation
-import Combine
 import AVFoundation
 import MediaPlayer
-import UIKit
+import SwiftUI
 
-/// Device-local, single-source music engine: downloaded authorized audio
-/// -> AVAudioFile -> AVAudioPlayerNode -> native DSP nodes -> hardware.
-/// Streaming (play-before-download-completes) is a separate milestone.
 @MainActor
 final class RINLUMusicEngine: ObservableObject {
     @Published private(set) var track: RINLUSong?
+    @Published private(set) var queue = [RINLUSong]()
     @Published private(set) var playing = false
-    @Published private(set) var position = 0.0
-    @Published private(set) var duration = 0.0
     @Published private(set) var loading = false
+    @Published private(set) var duration = 0.0
+    @Published private(set) var position = 0.0
     @Published private(set) var error: String?
-    @Published private(set) var dspEnabled = UserDefaults.standard.object(forKey: "rinlu-dsp-enabled") as? Bool ?? false
+    @Published private(set) var dspEnabled = false
     @Published private(set) var dspName = "RINLUDSP"
+    private let player = AVPlayer()
+    private var tap: RINLUTap?
+    private var workingFile: URL?
+    private var converting = false
+    private var wetCheckStart: Date?
+    private func discardWorkingFile() {
+        if let workingFile { try? FileManager.default.removeItem(at:workingFile) }
+        workingFile=nil
+    }
+    private var assetTrack: AVAssetTrack?
+    private var generation = UUID()
+    private var wantsPlay = false
+    private var interrupted = false
+    private var itemStatus: NSKeyValueObservation?
+    private var observers = [NSObjectProtocol]()
+    private var timer: Any?
+    private var revision: Int?
+    private var policy: RINLUDSPPolicy?
+    private var artwork: MPMediaItemArtwork?
+    private var eventID = UUID()
+    private var listened = 0.0
+    private var previousTime: Double?
+    private var retryCount = 0
+    private var eventSent = false
 
-    private let engine = AVAudioEngine()
-    private let source = AVAudioPlayerNode()
-    private let eq = AVAudioUnitEQ(numberOfBands: 31)
-    private let ambience = AVAudioUnitReverb()
-    private var file: AVAudioFile?
-    private var temporaryFile: URL?
-    private var queue: [RINLUSong] = []
-    private var index = 0
-    private var token = UUID()
-    private var startFrame: AVAudioFramePosition = 0
-    private var timer: Timer?
-    private var sessionObservers: [NSObjectProtocol] = []
-    private var commandTokens: [(MPRemoteCommand, Any)] = []
+    private var accountScope: String?
+    private var lastCheckpoint = -1
+    private var restored = false
+    private struct Checkpoint: Codable {
+        let queue: [String]
+        let selected: String
+        let seconds: Double
+    }
+    private var checkpointKey: String { "rinlu.queue." + (accountScope ?? "guest") }
+
+    func syncLibrary(_ songs: [RINLUSong], account: String?) {
+        let scope = account ?? "guest"
+        if let prior = accountScope, prior != scope {
+            checkpoint()
+            wantsPlay = false; generation = UUID()
+            itemStatus = nil; player.replaceCurrentItem(with: nil)
+            discardWorkingFile(); converting=false; track = nil; queue = []; assetTrack = nil; tap = nil; artwork = nil
+            playing = false; loading = false; error = nil; restored = false
+            MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
+        }
+        accountScope = scope
+        guard !restored, track == nil, !songs.isEmpty else { return }
+        restored = true
+        guard let data = UserDefaults.standard.data(forKey: checkpointKey),
+              let saved = try? JSONDecoder().decode(Checkpoint.self, from: data),
+              let selected = songs.first(where: { $0.id == saved.selected }) else { return }
+        let catalog = Dictionary(songs.map { ($0.id,$0) }, uniquingKeysWith: { first,_ in first })
+        queue = saved.queue.compactMap { catalog[$0] }
+        if queue.isEmpty { queue = [selected] }
+        track = selected; duration = selected.duration ?? 0
+        position = min(max(saved.seconds,0),duration); publish()
+    }
+    private func checkpoint() {
+        guard accountScope != nil, let track, position.isFinite else { return }
+        let saved = Checkpoint(queue: queue.prefix(300).map(\.id), selected: track.id, seconds: position)
+        if let data = try? JSONEncoder().encode(saved) { UserDefaults.standard.set(data,forKey:checkpointKey) }
+    }
 
     init() {
-        engine.attach(source)
-        engine.attach(eq)
-        engine.attach(ambience)
-        engine.connect(source, to: eq, format: nil)
-        engine.connect(eq, to: ambience, format: nil)
-        engine.connect(ambience, to: engine.mainMixerNode, format: nil)
-        ambience.loadFactoryPreset(.mediumHall)
-        eq.bypass = true
-        ambience.bypass = true
-        setupRemote()
-        sessionObservers.append(NotificationCenter.default.addObserver(
-            forName: AVAudioSession.interruptionNotification, object: nil, queue: .main
-        ) { [weak self] notification in
-            Task { @MainActor in self?.handleInterruption(notification) }
-        })
-        sessionObservers.append(NotificationCenter.default.addObserver(
-            forName: AVAudioSession.routeChangeNotification, object: nil, queue: .main
-        ) { [weak self] notification in
-            Task { @MainActor in self?.handleRoute(notification) }
-        })
-        timer = Timer.scheduledTimer(withTimeInterval: 0.4, repeats: true) { [weak self] _ in
-            Task { @MainActor in
-                self?.refreshPosition()
+        timer = player.addPeriodicTimeObserver(forInterval: CMTime(seconds: 0.4, preferredTimescale: 600), queue: .main) { [weak self] _ in
+            Task { @MainActor in self?.tick() }
+        }
+        func observe(_ name: Notification.Name, _ action: @escaping @MainActor (Notification) -> Void) {
+            observers.append(NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) { n in
+                Task { @MainActor in action(n) }
+            })
+        }
+        observe(.AVPlayerItemDidPlayToEndTime) { [weak self] n in
+            guard let self, let item = n.object as? AVPlayerItem, item === self.player.currentItem else { return }
+            self.saveEvent(completed: true)
+            if self.hasNext { Task { await self.next() } } else { self.pause(); self.seek(to: 0) }
+        }
+        observe(AVAudioSession.interruptionNotification) { [weak self] n in
+            guard let self, let t = n.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt else { return }
+            if t == AVAudioSession.InterruptionType.began.rawValue { self.interrupted = self.wantsPlay; self.pause() }
+            else if self.interrupted {
+                self.interrupted = false
+                if AVAudioSession.InterruptionOptions(rawValue: n.userInfo?[AVAudioSessionInterruptionOptionKey] as? UInt ?? 0).contains(.shouldResume) { self.resume() }
             }
+        }
+        observe(AVAudioSession.routeChangeNotification) { [weak self] n in
+            if n.userInfo?[AVAudioSessionRouteChangeReasonKey] as? UInt == AVAudioSession.RouteChangeReason.oldDeviceUnavailable.rawValue { self?.interrupted = false; self?.pause() }
+        }
+        let center = MPRemoteCommandCenter.shared()
+        func bind(_ command: MPRemoteCommand, _ action: @escaping @MainActor () -> Void) {
+            command.addTarget { _ in Task { @MainActor in action() }; return .success }
+        }
+        bind(center.playCommand) { [weak self] in self?.resume() }
+        bind(center.pauseCommand) { [weak self] in self?.pause() }
+        bind(center.togglePlayPauseCommand) { [weak self] in self?.toggle() }
+        bind(center.nextTrackCommand) { [weak self] in Task { await self?.next() } }
+        bind(center.previousTrackCommand) { [weak self] in Task { await self?.previous() } }
+        center.changePlaybackPositionCommand.addTarget { [weak self] event in
+            guard let e = event as? MPChangePlaybackPositionCommandEvent else { return .commandFailed }
+            Task { @MainActor in self?.seek(to: e.positionTime) }; return .success
         }
     }
 
     func apply(_ policy: RINLUDSPPolicy?) {
-        guard let policy = policy else { return }
-        dspName = policy.active.name
-        if UserDefaults.standard.object(forKey: "rinlu-dsp-enabled") == nil {
-            dspEnabled = policy.default_on
+        self.policy = policy
+        dspEnabled = policy?.enabled == true && (UserDefaults.standard.object(forKey: "rinlu-dsp-enabled") as? Bool ?? policy?.default_on ?? false)
+        dspName = policy?.active.name ?? "RINLUDSP"
+        if policy?.revision != revision {
+            revision = policy?.revision
+            if let item = player.currentItem, let assetTrack { configureDSP(item, assetTrack) }
         }
-        if !policy.enabled { setNodesEnabled(false); return }
-        let settings = policy.active.settings
-        let count = min(31, settings.bands, settings.gains.count)
-        let centers = [62.5,115.7,214.3,396.9,734.9,1360.8,2519.8,4666.1,8640.5,16000.0]
-        for i in 0..<31 {
-            let band = eq.bands[i]
-            band.filterType = .parametric
-            let frequency: Double = count == 10
-                ? centers[min(i, 9)]
-                : 20.0 * pow(1000.0, Double(i) / Double(max(1, count - 1)))
-            band.frequency = Float(min(frequency, 16000))
-            band.bandwidth = max(0.2, min(4.0, 1.0 / max(0.5, settings.bass + 1)))
-            band.gain = i < count ? settings.gains[i] * policy.active.strength : 0
-            band.bypass = i >= count
-        }
-        eq.globalGain = settings.preamp * policy.active.strength
-        ambience.wetDryMix = max(0, min(35, settings.room * 100 * policy.active.strength))
-        setNodesEnabled(policy.enabled && dspEnabled)
+        tap?.enabled = dspEnabled
     }
-
-    private func setNodesEnabled(_ value: Bool) {
-        eq.bypass = !value
-        ambience.bypass = !value
-    }
-
     func toggleDSP(policy: RINLUDSPPolicy?) {
-        dspEnabled.toggle()
-        UserDefaults.standard.set(dspEnabled, forKey: "rinlu-dsp-enabled")
+        UserDefaults.standard.set(!dspEnabled, forKey: "rinlu-dsp-enabled")
         apply(policy)
     }
-
+    private func configureDSP(_ item: AVPlayerItem, _ track: AVAssetTrack) {
+        guard let p = policy, let data = try? JSONEncoder().encode(p.active.settings),
+              let settings = (try? JSONSerialization.jsonObject(with: data)) as? [AnyHashable: Any] else {
+            tap = nil; item.audioMix = nil; return
+        }
+        let processor = RINLUTap(settings: settings, strength: Double(p.active.strength))
+        processor.enabled = dspEnabled
+        item.audioMix = processor.mix(for: track)
+        tap = processor
+        if item.audioMix == nil && dspEnabled { error = "Sound processing is unavailable for this recording." }
+    }
     func play(_ song: RINLUSong, queue songs: [RINLUSong]? = nil) async {
-        if let songs = songs, !songs.isEmpty {
-            queue = songs
-            index = songs.firstIndex(where: { $0.id == song.id }) ?? 0
-        } else {
-            queue = [song]
-            index = 0
-        }
-        token = UUID()
-        let generation = token
-        stopLocal()
-        track = song
-        position = 0
-        duration = song.duration ?? 0
-        loading = true
-        error = nil
-        updateNowPlaying()
+        saveEvent(completed: false)
+        eventID = UUID(); listened = 0; eventSent = false; previousTime = nil; retryCount = 0
+        artwork = nil; queue = songs ?? [song]; track = song; duration = song.duration ?? 0
+        wantsPlay = true; lastCheckpoint = -1
+        await load(song, from: 0)
+    }
+    private func load(_ song: RINLUSong, from seconds: Double, standardized: Bool = false) async {
+        generation = UUID(); let id = generation
+        itemStatus = nil; player.replaceCurrentItem(with: nil); assetTrack = nil; tap = nil
+        discardWorkingFile(); converting = standardized; wetCheckStart = nil
+        loading = true; playing = false; error = nil; position = seconds; publish()
         do {
-            // Authorization is generated per track, directly before transfer;
-            // do not pre-cache a five-minute token for the entire playlist.
-            let stream = try await RINLUAPI.shared.authorize(trackID: song.id)
-            let downloaded = try await RINLUAPI.shared.mediaDownload(stream)
-            guard generation == token else {
-                try? FileManager.default.removeItem(at: downloaded)
-                return
+            let url = try await RINLUAPI.shared.authorize(trackID: song.id)
+            let cookies = HTTPCookieStorage.shared.cookies(for: url) ?? []
+            let asset: AVURLAsset
+            if standardized {
+                let file=try await WorkingAudio.convert(url)
+                guard id==generation else {try? FileManager.default.removeItem(at:file);return}
+                workingFile=file;asset=AVURLAsset(url:file)
+            } else { asset=AVURLAsset(url:url,options:[AVURLAssetHTTPCookiesKey:cookies]) }
+            guard let channel = try await asset.loadTracks(withMediaType: .audio).first else { throw RINLUServiceError.invalidResponse }
+            guard id == generation else { return }
+            let item = AVPlayerItem(asset: asset)
+            assetTrack = channel; configureDSP(item, channel)
+            player.replaceCurrentItem(with: item)
+            if seconds > 0 { await player.seek(to: CMTime(seconds: seconds, preferredTimescale: 600)) }
+            guard id == generation else { return }
+            itemStatus = item.observe(\.status, options: [.initial, .new]) { [weak self] item, _ in
+                Task { @MainActor in
+                    guard let self, self.generation == id else { return }
+                    if item.status == .failed {
+                        if self.retryCount == 0 && self.wantsPlay {
+                            self.retryCount += 1; await self.load(song, from: self.position)
+                        } else { self.pause(); self.error = item.error?.localizedDescription ?? "Playback failed." }
+                    }
+                }
             }
-            temporaryFile = downloaded
-            try prepareFile(downloaded)
-            loading = false
-            resume()
+            if wantsPlay { resume() } else { loading = false }
+            if let url = song.artURL {
+                Task { [weak self] in
+                    guard let (bytes, _) = try? await URLSession.shared.data(from: url), let image = UIImage(data: bytes), self?.generation == id else { return }
+                    self?.artwork = MPMediaItemArtwork(boundsSize: image.size) { _ in image }; self?.publish()
+                }
+            }
         } catch {
-            if generation == token {
-                loading = false
-                self.error = error.localizedDescription
-                playing = false
-                updateNowPlaying()
-            }
+            guard id == generation else { return }
+            self.error = error.localizedDescription; pause()
         }
     }
-
-    private func prepareFile(_ url: URL) throws {
-        let music = try AVAudioFile(forReading: url)
-        file = music
-        duration = Double(music.length) / music.processingFormat.sampleRate
-        engine.stop()
-        engine.disconnectNodeOutput(source)
-        engine.connect(source, to: eq, format: music.processingFormat)
-        if !engine.isRunning { try engine.start() }
-        schedule(from: 0)
-        updateNowPlaying()
-    }
-
-    private func schedule(from frame: AVAudioFramePosition) {
-        guard let file = file else { return }
-        source.stop()
-        startFrame = max(0, min(frame, file.length))
-        let generation = token
-        let left = file.length - startFrame
-        guard left > 0 else { return }
-        source.scheduleSegment(file, startingFrame: startFrame,
-                               frameCount: AVAudioFrameCount(min(left, Int64(UInt32.max))),
-                               at: nil, completionCallbackType: .dataPlayedBack) { [weak self] _ in
-            Task { @MainActor in
-                guard let self = self, generation == self.token,
-                      self.file != nil, self.playing else { return }
-                await self.next()
-            }
-        }
-    }
-
     func resume() {
-        guard file != nil else { return }
-        do {
-            let audio = AVAudioSession.sharedInstance()
-            try audio.setCategory(.playback, mode: .default)
-            try audio.setActive(true)
-            if !engine.isRunning { try engine.start() }
-            source.play()
-            playing = true
-            updateNowPlaying()
-        } catch {
-            self.error = error.localizedDescription
+        guard track != nil else { return }; wantsPlay = true
+        if let song = track, (!loading && player.currentItem == nil) || player.currentItem?.status == .failed {
+            Task { await load(song, from: position) }; return
         }
+        do { let s = AVAudioSession.sharedInstance(); try s.setCategory(.playback); try s.setActive(true); player.play(); tick() }
+        catch { self.error = error.localizedDescription; pause() }
     }
-
-    func pause() {
-        source.pause()
-        playing = false
-        refreshPosition()
-        updateNowPlaying()
+    func pause() { wantsPlay = false; player.pause(); loading = false; playing = false; previousTime = nil; checkpoint(); publish() }
+    func toggle() { wantsPlay ? pause() : resume() }
+    func seek(to t: Double) {
+        guard t.isFinite else { return }
+        previousTime = nil; position = min(max(t,0),duration); player.seek(to: CMTime(seconds: position, preferredTimescale: 600)); publish()
     }
-
-    func toggle() { playing ? pause() : resume() }
-
-    func seek(to seconds: Double) {
-        guard let file = file, seconds.isFinite else { return }
-        let shouldResume = playing
-        let time = max(0, min(seconds, duration))
-        let frame = AVAudioFramePosition(time * file.processingFormat.sampleRate)
-        // Invalidate callbacks from the previous scheduled segment.
-        token = UUID()
-        schedule(from: frame)
-        position = time
-        if shouldResume { source.play() }
-        updateNowPlaying()
-    }
-
-    func next() async {
-        guard index + 1 < queue.count else {
-            pause()
-            return
+    private var index: Int { queue.firstIndex { $0.id == track?.id } ?? 0 }
+    var hasNext: Bool { index + 1 < queue.count }
+    func next() async { if hasNext { await play(queue[index+1], queue: queue) } }
+    func previous() async { if position > 3 || index == 0 { seek(to: 0) } else { await play(queue[index-1], queue: queue) } }
+    private func tick() {
+        guard let item = player.currentItem else { return }
+        let t = player.currentTime().seconds
+        if item.duration.seconds.isFinite { duration = item.duration.seconds }
+        playing = player.timeControlStatus == .playing
+        loading = wantsPlay && player.timeControlStatus == .waitingToPlayAtSpecifiedRate
+        if t.isFinite {
+            if playing, let last = previousTime, (0...1.5).contains(t-last) { listened += t-last }
+            position = t; previousTime = playing ? t : nil
         }
-        index += 1
-        await play(queue[index], queue: queue)
-    }
-
-    func previous() async {
-        if position >= 3 || index <= 0 {
-            seek(to: 0)
-        } else {
-            index -= 1
-            await play(queue[index], queue: queue)
-        }
-    }
-
-    func stop() {
-        token = UUID()
-        stopLocal()
-        track = nil
-        queue = []
-        position = 0
-        duration = 0
-        playing = false
-        MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
-        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
-    }
-
-    private func stopLocal() {
-        source.stop()
-        playing = false
-        file = nil
-        if let temporary = temporaryFile { try? FileManager.default.removeItem(at: temporary) }
-        temporaryFile = nil
-    }
-
-    private func refreshPosition() {
-        guard let file = file else { return }
-        if let node = source.lastRenderTime, let time = source.playerTime(forNodeTime: node) {
-            position = min(duration, Double(startFrame) / file.processingFormat.sampleRate
-                           + Double(time.sampleTime) / time.sampleRate)
-        }
-        if playing { updateNowPlaying() }
-    }
-
-    private func updateNowPlaying() {
-        guard let track = track else { return }
-        MPNowPlayingInfoCenter.default().nowPlayingInfo = [
-            MPMediaItemPropertyTitle: track.title,
-            MPMediaItemPropertyArtist: track.artist,
-            MPNowPlayingInfoPropertyElapsedPlaybackTime: position,
-            MPMediaItemPropertyPlaybackDuration: duration,
-            MPNowPlayingInfoPropertyPlaybackRate: playing ? 1.0 : 0.0
-        ]
-    }
-
-    private func setupRemote() {
-        let center = MPRemoteCommandCenter.shared()
-        func register(_ command: MPRemoteCommand, handler: @escaping () -> Void) {
-            let handle = command.addTarget { _ in
-                Task { @MainActor in handler() }
-                return .success
+        if playing, Int(position)/5 != lastCheckpoint { lastCheckpoint = Int(position)/5; checkpoint() }
+        if dspEnabled, playing, let tap, let song=track, !converting {
+            if wetCheckStart == nil {wetCheckStart=Date()}
+            if tap.formatUnsupported || (!tap.hasProcessedAudio && Date().timeIntervalSince(wetCheckStart ?? Date())>2) {
+                converting=true
+                Task { await load(song,from:position,standardized:true) }
             }
-            commandTokens.append((command, handle))
-        }
-        register(center.playCommand) { [weak self] in self?.resume() }
-        register(center.pauseCommand) { [weak self] in self?.pause() }
-        register(center.togglePlayPauseCommand) { [weak self] in self?.toggle() }
-        register(center.nextTrackCommand) { [weak self] in Task { await self?.next() } }
-        register(center.previousTrackCommand) { [weak self] in Task { await self?.previous() } }
-        let seekTarget = center.changePlaybackPositionCommand.addTarget { [weak self] event in
-            guard let event = event as? MPChangePlaybackPositionCommandEvent else { return .commandFailed }
-            Task { @MainActor in self?.seek(to: event.positionTime) }
-            return .success
-        }
-        commandTokens.append((center.changePlaybackPositionCommand, seekTarget))
+        } else { wetCheckStart=nil }
+        publish()
     }
-
-    private func handleInterruption(_ notification: Notification) {
-        guard let type = (notification.userInfo?[AVAudioSessionInterruptionTypeKey] as? NSNumber)?.uintValue,
-              let event = AVAudioSession.InterruptionType(rawValue: type) else { return }
-        if event == .began { pause() }
-        else if event == .ended {
-            let raw = (notification.userInfo?[AVAudioSessionInterruptionOptionKey] as? NSNumber)?.uintValue ?? 0
-            if AVAudioSession.InterruptionOptions(rawValue: raw).contains(.shouldResume) { resume() }
-        }
+    private func saveEvent(completed: Bool) {
+        guard !eventSent, listened >= 1, let track else { return }; eventSent = true
+        let body: [String: Any] = ["id":eventID.uuidString,"track_id":track.id,"seconds":min(7200,listened),"completed":completed]
+        Task { let _: [String:Bool]? = try? await RINLUAPI.shared.post("playback/event", payload: body) }
     }
+    private func publish() {
+        guard let track else { return }
+        var info: [String:Any] = [MPMediaItemPropertyTitle:track.title,MPMediaItemPropertyArtist:track.artist,
+            MPMediaItemPropertyPlaybackDuration:duration,MPNowPlayingInfoPropertyElapsedPlaybackTime:position,
+            MPNowPlayingInfoPropertyPlaybackRate:playing ? 1.0 : 0.0]
+        if let artwork { info[MPMediaItemPropertyArtwork] = artwork }
+        MPNowPlayingInfoCenter.default().nowPlayingInfo = info
+    }
+}
 
-    private func handleRoute(_ notification: Notification) {
-        guard let raw = (notification.userInfo?[AVAudioSessionRouteChangeReasonKey] as? NSNumber)?.uintValue,
-              let event = AVAudioSession.RouteChangeReason(rawValue: raw) else { return }
-        if event == .oldDeviceUnavailable { pause() }
+/// Decode unusual source rates into the same 48 kHz working format as the reference processor.
+private enum WorkingAudio {
+    static func convert(_ url: URL) async throws -> URL {
+        let (download, response) = try await URLSession.shared.download(from: url)
+        defer { try? FileManager.default.removeItem(at: download) }
+        guard let http=response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else { throw RINLUServiceError.invalidResponse }
+        return try await Task.detached(priority:.userInitiated) {
+            let source = try AVAudioFile(forReading:download)
+            guard let format=AVAudioFormat(standardFormatWithSampleRate:48000,channels:2),
+                  let converter=AVAudioConverter(from:source.processingFormat,to:format),
+                  let output=AVAudioPCMBuffer(pcmFormat:format,frameCapacity:8192) else {throw RINLUServiceError.invalidResponse}
+            let location=FileManager.default.temporaryDirectory.appendingPathComponent("rinlu-"+UUID().uuidString+".caf")
+            var finished=false
+            defer { if !finished { try? FileManager.default.removeItem(at:location) } }
+            let writer=try AVAudioFile(forWriting:location,settings:format.settings)
+            var readError:Error?
+            while true {
+                var conversionError:NSError?
+                let status=converter.convert(to:output,error:&conversionError){count,state in
+                    guard let input=AVAudioPCMBuffer(pcmFormat:source.processingFormat,frameCapacity:count) else {state.pointee = .endOfStream;readError=RINLUServiceError.invalidResponse;return nil}
+                    do {try source.read(into:input,frameCount:count)}
+                    catch {readError=error;state.pointee = .endOfStream;return nil}
+                    guard input.frameLength>0 else {state.pointee = .endOfStream;return nil}
+                    state.pointee = .haveData;return input
+                }
+                if let readError {throw readError}
+                if let conversionError {throw conversionError}
+                if status == .error {throw RINLUServiceError.invalidResponse}
+                if output.frameLength>0 {try writer.write(from:output)}
+                if status == .endOfStream {break}
+            }
+            finished=true;return location
+        }.value
     }
 }

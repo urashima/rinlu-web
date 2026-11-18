@@ -1,0 +1,48 @@
+name: RINLU hybrid iOS
+on:
+  pull_request:
+    branches: ['feature/rinlu-ios-native-v0.3']
+    paths: ['ios/**', '.github/workflows/ios-hybrid.yml']
+  push:
+    branches: ['feature/rinlu-ios-hybrid-v0.4']
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 18
+    defaults:
+      run:
+        working-directory: ios
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compare native samples
+        run: |
+          c++ -O2 -std=c++17 -ffp-contract=off Tests/render.cpp -o /tmp/rinlu-compare
+          node Tests/compare.mjs /tmp/rinlu-compare
+          node Tests/compare.mjs /tmp/rinlu-compare --long
+      - name: Build for Simulator
+        run: xcodebuild -quiet -project RINLU.xcodeproj -scheme RINLU -configuration Debug -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build
+      - name: Build for iPhone
+        run: xcodebuild -quiet -project RINLU.xcodeproj -scheme RINLU -configuration Release -destination 'generic/platform=iOS' CODE_SIGNING_ALLOWED=NO build
+      - name: Run live listening flow on iPhone Simulator
+        run: |
+          device=$(xcrun simctl list devices available -j | python3 -c 'import json,sys; print(next(d["udid"] for _,ds in sorted(json.load(sys.stdin)["devices"].items(),reverse=True) for d in ds if d["name"].startswith("iPhone")))')
+          xcodebuild -quiet -project RINLU.xcodeproj -scheme RINLU -destination "platform=iOS Simulator,id=$device" -parallel-testing-enabled NO -resultBundlePath "$RUNNER_TEMP/Listening.xcresult" test
+      - name: Save simulator results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Listening-Simulator
+          path: ${{ runner.temp }}/Listening.xcresult
+      - name: Export UI screenshots
+        if: always()
+        run: |
+          if test -d "$RUNNER_TEMP/Listening.xcresult"; then
+            xcrun xcresulttool export attachments --path "$RUNNER_TEMP/Listening.xcresult" --output-path "$RUNNER_TEMP/listening-screens"
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Listening-Screens
+          path: ${{ runner.temp }}/listening-screens/*.png

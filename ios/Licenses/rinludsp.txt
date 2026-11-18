@@ -1,0 +1,17 @@
+RINLUDSP 3.0 — AGPL-3.0-or-later.
+RINLU modifications and integration: Copyright 2026 RINLU.
+Original DSP work: Copyright (C) 2025 FxSound LLC.
+Contributors: www.theremino.com (2025), as credited by original modules.
+
+This is free software under the GNU Affero General Public License v3 or later,
+without warranty. Refactored derivative modules remain under that license.
+Original notices and modification details: /audio/rinludsp/kernel/NOTICE.txt
+Full license: /licenses/AGPL-3.0.txt
+Corresponding source and build instructions: /source/rinlu-player-source.tar.gz
+Source manifest and SHA-256: /source/manifest.json
+
+The reorganized kernel preserves reference arithmetic and rounding while using
+local ESM classes and a private registry. Rewriting or renaming code does not
+remove attribution or licensing obligations. This is not a clean-room claim.
+No ViPER source or binary is included. Software licensing grants no rights to
+recordings or artwork. See included notices and license for full terms.
