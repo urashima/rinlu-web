@@ -1,0 +1,45 @@
+name: Stage OVH rehearsal files
+on:
+  pull_request:
+    branches: [main]
+    paths: ['.github/workflows/stage-ovh-rehearsal.yml']
+
+permissions:
+  contents: read
+
+jobs:
+  stage:
+    if: github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'f002b/isolated-worker-rehearsal'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - name: Stage the reviewed files on OVH
+        env:
+          HOST: ${{ secrets.OVH_HOST }}
+          USER: ${{ secrets.OVH_USER }}
+          PORT: ${{ vars.OVH_SSH_PORT || '22' }}
+          SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.OVH_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          umask 077
+          ssh_dir=$(mktemp -d)
+          trap 'rm -rf -- "$ssh_dir"' EXIT
+          printf '%s\n' "$SSH_KEY" > "$ssh_dir/key"
+          printf '%s\n' "$KNOWN_HOSTS" > "$ssh_dir/known_hosts"
+          bundle=$(mktemp -d)
+          trap 'rm -rf -- "$ssh_dir" "$bundle"' EXIT
+          files=(services/ovh/install-rehearsal-access.sh services/ovh/rehearse-media.sh
+                 services/media-worker/{rehearse,worker,media_validation,audio_analysis,mail_delivery}.py)
+          cp --parents -- "${files[@]}" "$bundle"
+          cd "$bundle"
+          sha256sum -- "${files[@]}" > SHA256SUMS
+          sha256sum SHA256SUMS
+          tar -cf - -- "${files[@]}" SHA256SUMS | ssh -p "$PORT" -i "$ssh_dir/key" \
+            -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
+            -o UserKnownHostsFile="$ssh_dir/known_hosts" -- "$USER@$HOST" \
+            'set -eu; umask 077; dir=$(mktemp -d "$HOME/rinlu-rehearsal.XXXXXX"); tar -xf - -C "$dir"; cd "$dir"; sha256sum -c SHA256SUMS; printf "STAGED_DIRECTORY=%s\n" "$dir"'

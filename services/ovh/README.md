@@ -28,6 +28,18 @@ The legacy SONORA_* names remain accepted for existing installations. Renaming t
 
 To stop only this processor: `docker compose --project-name rinlu-processor --env-file /etc/rinlu/worker.env -f services/media-worker/compose.yaml stop`. No website or VPN container is stopped.
 
+## F-002b media worker rehearsal and acceptance
+
+From the reviewed checkout on OVH, run during a quiet window:
+
+```bash
+sudo bash services/ovh/rehearse-media.sh 6
+```
+
+This starts a disposable container from the image used by the existing processor and reads its ClamAV signature volume. The runner waits for FFmpeg to start, kills only its disposable process group with SIGKILL, then starts a new process and checks the MP3 it produces. The command records the scanner version, recovery time, queue wait, batch time and peak container memory. Keep the final JSON and the checked-out commit SHA in the acceptance record. Six 30-second samples give a baseline. Increase to 12 jobs for the next measurement if the first run fits the host's normal operating budget, and record the workload with the result.
+
+For the separate hosted acceptance, use an independent creator account to upload a short audio file it has permission to publish. Record the asset ID, the scanner result and attempt count in Operations. Have a reviewer approve the clean rendition. Publish as unlisted, obtain playback in an unauthenticated session and confirm a byte-range request returns 206. Withdraw the recording, then verify both new playback authorization and the previously signed URL are denied. Record the action times and HTTP statuses. Keep account credentials and signed URL values out of the acceptance record.
+
 ## Domain and identity
 
 The OVH public landing page may link to the private platform; it must identify the preview as requiring authorization. Copying the Worker bundle to Nginx will not migrate D1/R2 or trusted ChatGPT identity. A custom-domain binding or an explicit identity/data migration must be completed before treating rinlu.com as the full authenticated application.

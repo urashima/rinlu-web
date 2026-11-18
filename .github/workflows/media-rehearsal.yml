@@ -1,0 +1,41 @@
+name: Isolated media worker rehearsal
+on:
+  pull_request:
+    paths:
+      - 'services/media-worker/**'
+      - 'services/ovh/rehearse-media.sh'
+      - 'services/ovh/install-rehearsal-access.sh'
+      - '.github/workflows/media-rehearsal.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  rehearse:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate the operator scripts
+        run: |
+          bash -n services/ovh/rehearse-media.sh
+          bash -n services/ovh/install-rehearsal-access.sh
+      - name: Build the media processor image
+        run: docker build --tag rinlu-media-rehearsal services/media-worker
+      - name: Run the OVH rehearsal command in the CI sandbox
+        run: |
+          set -euo pipefail
+          docker volume create rinlu-processor_signatures
+          docker create --name rinlu-processor-media-worker-1 rinlu-media-rehearsal
+          # Use a local synthetic signature. The OVH command uses its installed database.
+          docker run --rm --network none --user root \
+            --mount type=volume,src=rinlu-processor_signatures,dst=/db \
+            --entrypoint sh rinlu-media-rehearsal -c \
+            'printf "%s\n" "Rinlu.Rehearsal.Canary:0:*:52494e4c552052454845415253414c2043414e415259" > /db/ci.ndb'
+          bash services/ovh/rehearse-media.sh 2
+          test "$(docker inspect --format '{{.State.Status}}' rinlu-processor-media-worker-1)" = created
+          if docker container inspect rinlu-media-rehearsal >/dev/null 2>&1; then
+            echo 'Disposable rehearsal container was not removed' >&2
+            exit 1
+          fi

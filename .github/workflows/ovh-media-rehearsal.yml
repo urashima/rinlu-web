@@ -1,0 +1,36 @@
+name: OVH media rehearsal
+on:
+  pull_request:
+    branches: [main]
+    paths: ['.github/workflows/ovh-media-rehearsal.yml']
+  workflow_dispatch:
+
+permissions: {}
+concurrency:
+  group: ovh-media-rehearsal
+  cancel-in-progress: false
+
+jobs:
+  rehearse:
+    if: github.event_name == 'workflow_dispatch' || (github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'f002b/isolated-worker-rehearsal')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Call the fixed rehearsal command on OVH
+        env:
+          HOST: ${{ secrets.OVH_HOST }}
+          USER: ${{ secrets.OVH_USER }}
+          PORT: ${{ vars.OVH_SSH_PORT || '22' }}
+          SSH_KEY: ${{ secrets.OVH_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.OVH_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          umask 077
+          ssh_dir=$(mktemp -d)
+          trap 'rm -rf -- "$ssh_dir"' EXIT
+          printf '%s\n' "$SSH_KEY" > "$ssh_dir/key"
+          printf '%s\n' "$KNOWN_HOSTS" > "$ssh_dir/known_hosts"
+          ssh -p "$PORT" -i "$ssh_dir/key" \
+            -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
+            -o UserKnownHostsFile="$ssh_dir/known_hosts" -- "$USER@$HOST" \
+            'sudo -n /opt/rinlu-media-rehearsal/services/ovh/rehearse-media.sh 6'
