@@ -469,7 +469,7 @@ private struct RINLUPulseGame: View {
         let node = SCNNode()
         node.camera = camera
         node.position = SCNVector3(0, 3, 7)
-        node.eulerAngles.x = -.35
+        node.eulerAngles.x = -0.35
         scene.rootNode.addChildNode(node)
         let floor = SCNBox(width: 4.6, height: 0.08, length: 35, chamferRadius: 0)
         floor.firstMaterial?.diffuse.contents = UIColor(white: 0.12, alpha: 1)
