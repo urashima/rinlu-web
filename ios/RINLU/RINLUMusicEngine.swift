@@ -21,7 +21,6 @@ final class RINLUMusicEngine: ObservableObject {
     private let engine = AVAudioEngine()
     private let source = AVAudioPlayerNode()
     private let eq = AVAudioUnitEQ(numberOfBands: 31)
-    private let dynamics = AVAudioUnitDynamicsProcessor()
     private let ambience = AVAudioUnitReverb()
     private var file: AVAudioFile?
     private var temporaryFile: URL?
@@ -36,15 +35,12 @@ final class RINLUMusicEngine: ObservableObject {
     init() {
         engine.attach(source)
         engine.attach(eq)
-        engine.attach(dynamics)
         engine.attach(ambience)
         engine.connect(source, to: eq, format: nil)
-        engine.connect(eq, to: dynamics, format: nil)
-        engine.connect(dynamics, to: ambience, format: nil)
+        engine.connect(eq, to: ambience, format: nil)
         engine.connect(ambience, to: engine.mainMixerNode, format: nil)
         ambience.loadFactoryPreset(.mediumHall)
         eq.bypass = true
-        dynamics.bypass = true
         ambience.bypass = true
         setupRemote()
         sessionObservers.append(NotificationCenter.default.addObserver(
@@ -86,17 +82,12 @@ final class RINLUMusicEngine: ObservableObject {
             band.bypass = i >= count
         }
         eq.globalGain = settings.preamp * policy.active.strength
-        dynamics.threshold = -12 - settings.compression * 12
-        dynamics.headRoom = 5
-        dynamics.expansionRatio = 1
-        dynamics.masterGain = 0
         ambience.wetDryMix = max(0, min(35, settings.room * 100 * policy.active.strength))
         setNodesEnabled(policy.enabled && dspEnabled)
     }
 
     private func setNodesEnabled(_ value: Bool) {
         eq.bypass = !value
-        dynamics.bypass = !value
         ambience.bypass = !value
     }
 
