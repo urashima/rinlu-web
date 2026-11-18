@@ -1,0 +1,43 @@
+name: Inspect verified canonical RINLU platform source
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/canonical-audit.yml'
+      - 'ios/**'
+      - 'services/mobile-api/**'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  source-inspection:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Verify publicly distributed canonical source archive
+        run: node scripts/prepare-platform.mjs
+      - name: Inspect source structure without printing content/secrets
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+          root=Path('.platform-source/rinlu-player-source')
+          paths=sorted(p.relative_to(root).as_posix() for p in root.rglob('*') if p.is_file())
+          wanted=[p for p in paths if any(x in p.lower() for x in [
+            'dsp','audio','play','route','api','auth','client','sound','preset','source','server','game','studio'
+          ])]
+          print('SOURCE TOTAL FILES',len(paths))
+          print('PATHS',json.dumps(wanted[:300],ensure_ascii=False))
+          Path('.platform-source/audit-index.json').write_text(json.dumps(
+            {'files':paths,'matched':wanted},indent=2,ensure_ascii=False),encoding='utf-8')
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rinlu-verified-public-source-for-native-integration
+          path: |
+            .platform-source/release.tar.gz
+            .platform-source/audit-index.json
+          retention-days: 2
