@@ -31,6 +31,12 @@ jobs:
         id: platform
         run: node scripts/prepare-platform.mjs
 
+      - name: Test native mobile API gateway before accessing deployment credentials
+        if: steps.platform.outputs.changed == 'true'
+        run: |
+          set -euo pipefail
+          node --test services/mobile-gateway/mobile-api.test.mjs
+
       - name: Build the complete platform client and gateway
         if: steps.platform.outputs.changed == 'true'
         run: |
@@ -138,6 +144,32 @@ jobs:
           actual=json.loads(pathlib.Path('/tmp/rinlu-live-release.json').read_text())
           assert actual['source_sha256']==expected['source_sha256'], 'Production release mismatch'
           print('Both sites synchronized:', actual['source_sha256'])
+          PY
+
+      - name: Verify public HTTPS mobile API and release overlay
+        if: steps.platform.outputs.changed == 'true'
+        run: |
+          set -euo pipefail
+          curl -fsSL --retry 5 --retry-delay 3 'https://rinlu.com/music/api/mobile/v1/capabilities' -o /tmp/rinlu-mobile-capabilities.json
+          curl -fsSL --retry 5 --retry-delay 3 'https://rinlu.com/music/api/mobile/v1/bootstrap' -o /tmp/rinlu-mobile-bootstrap.json
+          curl -fsSL --retry 5 --retry-delay 3 'https://rinlu.com/music/api/mobile/v1/search?q=rinlu&limit=10' -o /tmp/rinlu-mobile-search.json
+          python3 - <<'PY'
+          import json,pathlib
+          def read(name):
+              return json.loads(pathlib.Path('/tmp/'+name).read_text())
+          expected=json.loads(pathlib.Path('platform-runtime/public/_release.json').read_text())
+          actual=read('rinlu-live-release.json')
+          assert actual['source_sha256']==expected['source_sha256'], 'Site source hash changed'
+          assert actual['gateway_overlay_sha256']==expected['gateway_overlay_sha256'], 'Mobile API gateway overlay mismatch'
+          cap=read('rinlu-mobile-capabilities.json')
+          assert cap['version']==1 and cap['api']['catalog']=='/music/api/catalog', 'Mobile capabilities invalid'
+          boot=read('rinlu-mobile-bootstrap.json')
+          assert isinstance(boot.get('tracks'),list) and isinstance(boot.get('dsp'),dict), 'Mobile bootstrap incomplete'
+          assert boot.get('user') is None, 'Anonymous bootstrap exposed user identity'
+          assert all('owner_id' not in t and 'asset_id' not in t for t in boot['tracks']), 'Private catalog fields leaked'
+          search=read('rinlu-mobile-search.json')
+          assert isinstance(search.get('items'),list), 'Mobile search malformed'
+          print('PUBLIC HTTPS MOBILE API VERIFIED:', len(boot['tracks']), 'public tracks')
           PY
 
       - name: Verify public privacy policy and footer
