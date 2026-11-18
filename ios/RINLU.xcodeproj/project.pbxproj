@@ -10,6 +10,12 @@
         ABCD0000000000000000001B /* NativeAudioBridge.swift in Sources */ = {
             isa = PBXBuildFile; fileRef = ABCD00000000000000000019 /* NativeAudioBridge.swift */;
         };
+        ABCD00000000000000000023 /* RINLUAPI.swift in Sources */ = { isa = PBXBuildFile; fileRef = ABCD00000000000000000020 /* RINLUAPI.swift */; };
+        ABCD00000000000000000024 /* RINLUMusicEngine.swift in Sources */ = { isa = PBXBuildFile; fileRef = ABCD00000000000000000021 /* RINLUMusicEngine.swift */; };
+        ABCD00000000000000000025 /* RINLUNativeRootView.swift in Sources */ = { isa = PBXBuildFile; fileRef = ABCD00000000000000000022 /* RINLUNativeRootView.swift */; };
+        ABCD00000000000000000020 /* RINLUAPI.swift */ = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RINLUAPI.swift; sourceTree = "<group>"; };
+        ABCD00000000000000000021 /* RINLUMusicEngine.swift */ = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RINLUMusicEngine.swift; sourceTree = "<group>"; };
+        ABCD00000000000000000022 /* RINLUNativeRootView.swift */ = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RINLUNativeRootView.swift; sourceTree = "<group>"; };
         ABCD0000000000000000000E /* AppDelegate.swift in Sources */ = {
             isa = PBXBuildFile; fileRef = ABCD00000000000000000007 /* AppDelegate.swift */;
         };
@@ -62,6 +68,9 @@
                 ABCD00000000000000000009 /* MainViewController.swift */,
                 ABCD00000000000000000018 /* NativeAudioPlayer.swift */,
                 ABCD00000000000000000019 /* NativeAudioBridge.swift */,
+                ABCD00000000000000000020 /* RINLUAPI.swift */,
+                ABCD00000000000000000021 /* RINLUMusicEngine.swift */,
+                ABCD00000000000000000022 /* RINLUNativeRootView.swift */,
                 ABCD0000000000000000000A /* Info.plist */,
                 ABCD00000000000000000006 /* Assets.xcassets */,
             );
@@ -83,6 +92,9 @@
                 ABCD00000000000000000010 /* MainViewController.swift in Sources */,
                 ABCD0000000000000000001A /* NativeAudioPlayer.swift in Sources */,
                 ABCD0000000000000000001B /* NativeAudioBridge.swift in Sources */,
+                ABCD00000000000000000023 /* RINLUAPI.swift in Sources */,
+                ABCD00000000000000000024 /* RINLUMusicEngine.swift in Sources */,
+                ABCD00000000000000000025 /* RINLUNativeRootView.swift in Sources */,
             );
             runOnlyForDeploymentPostprocessing = 0;
         };
@@ -181,7 +193,7 @@
                 INFOPLIST_FILE = RINLU/Info.plist;
                 IPHONEOS_DEPLOYMENT_TARGET = 16.0;
                 LD_RUNPATH_SEARCH_PATHS = ("$(inherited)", "@executable_path/Frameworks");
-                MARKETING_VERSION = 0.2.0;
+                MARKETING_VERSION = 0.3.0;
                 PRODUCT_BUNDLE_IDENTIFIER = com.rinlu.music;
                 PRODUCT_NAME = "$(TARGET_NAME)";
                 SDKROOT = iphoneos;
@@ -200,7 +212,7 @@
                 INFOPLIST_FILE = RINLU/Info.plist;
                 IPHONEOS_DEPLOYMENT_TARGET = 16.0;
                 LD_RUNPATH_SEARCH_PATHS = ("$(inherited)", "@executable_path/Frameworks");
-                MARKETING_VERSION = 0.2.0;
+                MARKETING_VERSION = 0.3.0;
                 PRODUCT_BUNDLE_IDENTIFIER = com.rinlu.music;
                 PRODUCT_NAME = "$(TARGET_NAME)";
                 SDKROOT = iphoneos;

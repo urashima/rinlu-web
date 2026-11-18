@@ -1,0 +1,76 @@
+name: Inspect verified canonical RINLU platform source
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/canonical-audit.yml'
+      - 'ios/**'
+      - 'services/mobile-api/**'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  source-inspection:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Verify publicly distributed canonical source archive
+        run: node scripts/prepare-platform.mjs
+      - name: Inspect source structure without printing content/secrets
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+          root=Path('.platform-source/rinlu-player-source')
+          paths=sorted(p.relative_to(root).as_posix() for p in root.rglob('*') if p.is_file())
+          wanted=[p for p in paths if any(x in p.lower() for x in [
+            'dsp','audio','play','route','api','auth','client','sound','preset','source','server','game','studio'
+          ])]
+          print('SOURCE TOTAL FILES',len(paths))
+          print('PATHS',json.dumps(wanted[:300],ensure_ascii=False))
+          Path('.platform-source/audit-index.json').write_text(json.dumps(
+            {'files':paths,'matched':wanted},indent=2,ensure_ascii=False),encoding='utf-8')
+          PY
+      - name: Apply native mobile API overlay in isolated canonical checkout
+        run: |
+          node --check scripts/apply-mobile-overlay.mjs
+          node scripts/apply-mobile-overlay.mjs .platform-source/rinlu-player-source
+          python3 - <<'PY'
+          from pathlib import Path
+          root=Path('.platform-source/rinlu-player-source')
+          server=(root/'lib/server.ts').read_text()
+          module=(root/'lib/mobile-api.ts').read_text()
+          assert "resource==='mobile'&&p[1]==='v1'" in server
+          assert 'mobileAPI' in server and 'listenerSoundPolicy' in module
+          assert 'bootstrap' in module and 'search' in module
+          print('Verified mobile route registration and policy inclusion')
+          PY
+      - name: Check patched server TypeScript and business tests
+        run: |
+          npm install --global pnpm@11.25.0
+          cd .platform-source/rinlu-player-source
+          pnpm install --frozen-lockfile
+          pnpm exec vite build --config deployment/platform/vite.config.mjs
+          node scripts/tests/sound-policy-integration.mjs
+      - name: Package patch files for canonical Sites handoff
+        run: |
+          mkdir -p .platform-source/native-mobile-patch/lib
+          cp .platform-source/rinlu-player-source/lib/mobile-api.ts .platform-source/native-mobile-patch/lib/
+          cp .platform-source/rinlu-player-source/lib/server.ts .platform-source/native-mobile-patch/lib/
+          cp services/mobile-api/mobile-api.ts .platform-source/native-mobile-patch/mobile-api-source.ts
+          (cd .platform-source && zip -qr native-mobile-patch.zip native-mobile-patch)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rinlu-verified-public-source-for-native-integration
+          path: |
+            .platform-source/release.tar.gz
+            .platform-source/audit-index.json
+          retention-days: 2
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rinlu-ios-native-mobile-api-patch
+          path: .platform-source/native-mobile-patch.zip
+          retention-days: 14

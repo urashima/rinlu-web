@@ -1,3 +1,4 @@
+import SwiftUI
 import UIKit
 
 final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
@@ -7,7 +8,7 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
                options connectionOptions: UIScene.ConnectionOptions) {
         guard let windowScene = scene as? UIWindowScene else { return }
         let window = UIWindow(windowScene: windowScene)
-        window.rootViewController = MainViewController()
+        window.rootViewController = UIHostingController(rootView: RINLUNativeRootView())
         window.makeKeyAndVisible()
         self.window = window
     }
