@@ -157,7 +157,7 @@ private struct RINLUSongList: View {
         }
         .navigationTitle(title)
         .overlay {
-            if songs.isEmpty { ContentUnavailableView("暂无歌曲", systemImage: "music.note") }
+            if songs.isEmpty { VStack(spacing: 10) { Image(systemName: "music.note").font(.title); Text("暂无歌曲") }.foregroundStyle(.secondary) }
         }
         .refreshable { await store.refresh() }
     }
