@@ -17,6 +17,16 @@ for (const file of ['server.mjs', 'Dockerfile']) {
 await cp(source + '/platform-dist', runtime + '/public', {recursive: true});
 await cp(releasePath, runtime + '/public/_release.json');
 
+// Preserve the canonical platform build while adding the public legal footer link
+// to the OVH-hosted client. Source manifest verification remains unchanged.
+const indexPath = runtime + '/public/index.html';
+const indexHtml = await readFile(indexPath, 'utf8');
+if (!indexHtml.includes('</body>')) throw new Error('Built platform HTML has no closing body tag');
+if (indexHtml.includes('privacy-footer.js')) throw new Error('Duplicate privacy footer injection');
+await cp('scripts/privacy-footer.js', runtime + '/public/privacy-footer.js');
+await writeFile(indexPath, indexHtml.replace('</body>', '<script defer src="/music/privacy-footer.js"></script>\n</body>'));
+
+
 const destination = runtime + '/public/source';
 await mkdir(destination, {recursive: true});
 await cp(archivePath, destination + '/rinlu-player-source.tar.gz');

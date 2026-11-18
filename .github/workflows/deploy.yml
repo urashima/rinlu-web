@@ -126,3 +126,28 @@ jobs:
           assert actual['source_sha256']==expected['source_sha256'], 'Production release mismatch'
           print('Both sites synchronized:', actual['source_sha256'])
           PY
+
+      - name: Verify public privacy policy and footer
+        if: steps.platform.outputs.changed == 'true'
+        run: |
+          set -euo pipefail
+          curl -fsSL --retry 5 --retry-delay 3 https://rinlu.com/music/privacy -o /tmp/rinlu-privacy.html
+          curl -fsSL --retry 5 --retry-delay 3 https://rinlu.com/music/ -o /tmp/rinlu-music.html
+          curl -fsSL --retry 5 --retry-delay 3 https://rinlu.com/music/privacy-footer.js -o /tmp/rinlu-privacy-footer.js
+          curl -fsSL --retry 5 --retry-delay 3 https://rinlu.com/ -o /tmp/rinlu-root.html
+          curl -fsSL --retry 5 --retry-delay 3 https://rinlu.com/en.html -o /tmp/rinlu-root-en.html
+          python3 - <<'PY'
+          from pathlib import Path
+          policy = Path('/tmp/rinlu-privacy.html').read_text()
+          music = Path('/tmp/rinlu-music.html').read_text()
+          footer = Path('/tmp/rinlu-privacy-footer.js').read_text()
+          root = Path('/tmp/rinlu-root.html').read_text()
+          root_en = Path('/tmp/rinlu-root-en.html').read_text()
+          assert '<article id="zh"' in policy and '<article id="en"' in policy, 'Bilingual policy missing'
+          assert 'Google' in policy and '隐私政策' in policy, 'Policy content missing'
+          assert '/music/privacy-footer.js' in music, 'Music footer injection missing'
+          assert 'dataset.rinluPrivacyFooter' in footer and '/music/privacy' in footer, 'Music footer script incorrect'
+          assert 'href="/music/privacy"' in root, 'Chinese homepage footer link missing'
+          assert 'href="/music/privacy?lang=en"' in root_en, 'English homepage footer link missing'
+          print('PUBLIC HTTPS VALIDATION PASSED: bilingual privacy and footers')
+          PY
