@@ -102,6 +102,19 @@ jobs:
           trap 'rm -f /tmp/rinlu-worker.env' EXIT
           scp -P "$PORT" -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes /tmp/rinlu-worker.env "$USER@$HOST:/home/ubuntu/rinlu-worker.env"
 
+      - name: Deliver Google credentials to the OVH runtime
+        if: steps.platform.outputs.changed == 'true'
+        env:
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          HOST: ${{ secrets.OVH_HOST }}
+          USER: ${{ secrets.OVH_USER }}
+          PORT: ${{ vars.OVH_SSH_PORT || '22' }}
+        run: |
+          set -euo pipefail
+          [[ "$GOOGLE_CLIENT_SECRET" =~ ^[A-Za-z0-9_-]+$ ]] || { echo 'Missing or invalid Google client secret'; exit 1; }
+          printf 'GOOGLE_CLIENT_ID=%s\nGOOGLE_CLIENT_SECRET=%s\n' '370963831446-7jm67b901aag972anf6t22vh6l7sltt0.apps.googleusercontent.com' "$GOOGLE_CLIENT_SECRET" |
+            ssh -p "$PORT" -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes "$USER@$HOST" 'set -eu; umask 077; f=$(mktemp "$HOME/.rinlu-google.XXXXXX"); trap '\''rm -f "$f"'\'' EXIT; cat > "$f"; mv -f "$f" "$HOME/rinlu-google.env"'
+
       - name: Publish site and verify HTTP 80
         if: steps.platform.outputs.changed == 'true'
         env:

@@ -16,7 +16,15 @@ if docker inspect rinlu-platform >/dev/null 2>&1; then OLD_PLATFORM="$(docker in
 docker build -t "rinlu-platform:$RELEASE" "$DIR/platform-runtime"
 docker build -t "rinlu-web:$RELEASE" "$DIR"
 docker network inspect rinlu-music >/dev/null 2>&1 || docker network create rinlu-music >/dev/null
-start_platform(){ docker run -d --name rinlu-platform --network rinlu-music --restart unless-stopped --read-only --tmpfs /tmp:size=16m --memory 256m --cpus 1 --pids-limit 100 --cap-drop ALL --security-opt no-new-privileges -e NODE_ENV=production "$1" >/dev/null; }
+install -d -m 700 /etc/rinlu
+google_env=/home/ubuntu/rinlu-google.env
+if [[ -f "$google_env" && ! -L "$google_env" ]]; then
+ install -o root -g root -m 600 "$google_env" /etc/rinlu/google.env.new
+ mv /etc/rinlu/google.env.new /etc/rinlu/google.env
+ rm -f "$google_env"
+fi
+[[ -s /etc/rinlu/google.env ]]
+start_platform(){ docker run -d --name rinlu-platform --network rinlu-music --restart unless-stopped --read-only --tmpfs /tmp:size=16m --memory 256m --cpus 1 --pids-limit 100 --cap-drop ALL --security-opt no-new-privileges --env-file /etc/rinlu/google.env -e NODE_ENV=production "$1" >/dev/null; }
 start_web(){ docker run -d --name rinlu-web --network rinlu-music --restart unless-stopped --memory 256m --cpus 0.5 --security-opt no-new-privileges -p 0.0.0.0:80:80 "$1" >/dev/null; }
 rollback(){
  echo 'Deployment failed; restoring the previous containers.' >&2
