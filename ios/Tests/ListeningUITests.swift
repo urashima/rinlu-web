@@ -5,7 +5,7 @@ final class ListeningUITests: XCTestCase {
         continueAfterFailure = false
         let app = XCUIApplication()
         app.launch()
-        let featured = app.buttons.matching(identifier: "featuredSong").first
+        let featured = app.buttons.matching(identifier: "featuredSong").firstMatch
         XCTAssertTrue(featured.waitForExistence(timeout: 50), app.debugDescription)
         capture("Home",app)
         featured.tap()
