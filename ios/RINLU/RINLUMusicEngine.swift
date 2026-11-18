@@ -15,6 +15,13 @@ final class RINLUMusicEngine: ObservableObject {
     @Published private(set) var dspName = "RINLUDSP"
     private let player = AVPlayer()
     private var tap: RINLUTap?
+    private var workingFile: URL?
+    private var converting = false
+    private var wetCheckStart: Date?
+    private func discardWorkingFile() {
+        if let workingFile { try? FileManager.default.removeItem(at:workingFile) }
+        workingFile=nil
+    }
     private var assetTrack: AVAssetTrack?
     private var generation = UUID()
     private var wantsPlay = false
@@ -47,7 +54,7 @@ final class RINLUMusicEngine: ObservableObject {
             checkpoint()
             wantsPlay = false; generation = UUID()
             itemStatus = nil; player.replaceCurrentItem(with: nil)
-            track = nil; queue = []; assetTrack = nil; tap = nil; artwork = nil
+            discardWorkingFile(); converting=false; track = nil; queue = []; assetTrack = nil; tap = nil; artwork = nil
             playing = false; loading = false; error = nil; restored = false
             MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
         }
@@ -141,14 +148,20 @@ final class RINLUMusicEngine: ObservableObject {
         wantsPlay = true; lastCheckpoint = -1
         await load(song, from: 0)
     }
-    private func load(_ song: RINLUSong, from seconds: Double) async {
+    private func load(_ song: RINLUSong, from seconds: Double, standardized: Bool = false) async {
         generation = UUID(); let id = generation
         itemStatus = nil; player.replaceCurrentItem(with: nil); assetTrack = nil; tap = nil
+        discardWorkingFile(); converting = standardized; wetCheckStart = nil
         loading = true; playing = false; error = nil; position = seconds; publish()
         do {
             let url = try await RINLUAPI.shared.authorize(trackID: song.id)
             let cookies = HTTPCookieStorage.shared.cookies(for: url) ?? []
-            let asset = AVURLAsset(url: url, options: [AVURLAssetHTTPCookiesKey: cookies])
+            let asset: AVURLAsset
+            if standardized {
+                let file=try await WorkingAudio.convert(url)
+                guard id==generation else {try? FileManager.default.removeItem(at:file);return}
+                workingFile=file;asset=AVURLAsset(url:file)
+            } else { asset=AVURLAsset(url:url,options:[AVURLAssetHTTPCookiesKey:cookies]) }
             guard let channel = try await asset.loadTracks(withMediaType: .audio).first else { throw RINLUServiceError.invalidResponse }
             guard id == generation else { return }
             let item = AVPlayerItem(asset: asset)
@@ -207,7 +220,13 @@ final class RINLUMusicEngine: ObservableObject {
             position = t; previousTime = playing ? t : nil
         }
         if playing, Int(position)/5 != lastCheckpoint { lastCheckpoint = Int(position)/5; checkpoint() }
-        if tap?.formatUnsupported == true && dspEnabled { error = "Original audio · DSP requires 44.1 or 48 kHz mono/stereo PCM." }
+        if dspEnabled, playing, let tap, let song=track, !converting {
+            if wetCheckStart == nil {wetCheckStart=Date()}
+            if tap.formatUnsupported || (!tap.hasProcessedAudio && Date().timeIntervalSince(wetCheckStart ?? Date())>2) {
+                converting=true
+                Task { await load(song,from:position,standardized:true) }
+            }
+        } else { wetCheckStart=nil }
         publish()
     }
     private func saveEvent(completed: Bool) {
@@ -222,5 +241,41 @@ final class RINLUMusicEngine: ObservableObject {
             MPNowPlayingInfoPropertyPlaybackRate:playing ? 1.0 : 0.0]
         if let artwork { info[MPMediaItemPropertyArtwork] = artwork }
         MPNowPlayingInfoCenter.default().nowPlayingInfo = info
+    }
+}
+
+/// Decode unusual source rates into the same 48 kHz working format as the reference processor.
+private enum WorkingAudio {
+    static func convert(_ url: URL) async throws -> URL {
+        let (download, response) = try await URLSession.shared.download(from: url)
+        defer { try? FileManager.default.removeItem(at: download) }
+        guard let http=response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else { throw RINLUServiceError.invalidResponse }
+        return try await Task.detached(priority:.userInitiated) {
+            let source = try AVAudioFile(forReading:download)
+            guard let format=AVAudioFormat(standardFormatWithSampleRate:48000,channels:2),
+                  let converter=AVAudioConverter(from:source.processingFormat,to:format),
+                  let output=AVAudioPCMBuffer(pcmFormat:format,frameCapacity:8192) else {throw RINLUServiceError.invalidResponse}
+            let location=FileManager.default.temporaryDirectory.appendingPathComponent("rinlu-"+UUID().uuidString+".caf")
+            var finished=false
+            defer { if !finished { try? FileManager.default.removeItem(at:location) } }
+            let writer=try AVAudioFile(forWriting:location,settings:format.settings)
+            var readError:Error?
+            while true {
+                var conversionError:NSError?
+                let status=converter.convert(to:output,error:&conversionError){count,state in
+                    guard let input=AVAudioPCMBuffer(pcmFormat:source.processingFormat,frameCapacity:count) else {state.pointee = .endOfStream;readError=RINLUServiceError.invalidResponse;return nil}
+                    do {try source.read(into:input,frameCount:count)}
+                    catch {readError=error;state.pointee = .endOfStream;return nil}
+                    guard input.frameLength>0 else {state.pointee = .endOfStream;return nil}
+                    state.pointee = .haveData;return input
+                }
+                if let readError {throw readError}
+                if let conversionError {throw conversionError}
+                if status == .error {throw RINLUServiceError.invalidResponse}
+                if output.frameLength>0 {try writer.write(from:output)}
+                if status == .endOfStream {break}
+            }
+            finished=true;return location
+        }.value
     }
 }

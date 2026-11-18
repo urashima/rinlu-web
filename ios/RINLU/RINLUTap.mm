@@ -30,7 +30,7 @@ static Sound decode(NSDictionary *settings,double strength){
  s.leveling=value(@"leveling",0,1)*strength;s.preamp=value(@"preamp",-18,6)*strength;
  return s;
 }
-struct Control {Sound settings;std::atomic<bool> enabled{false},unsupported{false};};
+struct Control {Sound settings;std::atomic<bool> enabled{false},unsupported{false},processed{false};};
 struct Context {
  std::shared_ptr<Control> control;
  std::unique_ptr<Processor> dsp;
@@ -57,6 +57,7 @@ static void process(MTAudioProcessingTapRef tap,CMItemCount requested,MTAudioPro
  auto a=(float*)list->mBuffers[0].mData;
  auto b=(c.channels==2 && c.planar && list->mNumberBuffers>=2)?(float*)list->mBuffers[1].mData:nullptr;
  if(c.planar && c.channels==2 && !b)return;
+ if(*frames && enabled)c.control->processed.store(true);
  for(CMItemCount i=0;i<*frames;++i){
   int offset=int(i)*(c.planar?1:c.channels);float l=a[offset],r=c.channels==1?l:(b?b[i]:a[offset+1]);
   float wetL=l,wetR=r;c.dsp->tick(wetL,wetR);
@@ -71,6 +72,7 @@ static void process(MTAudioProcessingTapRef tap,CMItemCount requested,MTAudioPro
 }
 - (BOOL)enabled{return _control->enabled.load();}
 - (void)setEnabled:(BOOL)enabled{_control->enabled.store(enabled);}
+- (BOOL)hasProcessedAudio{return _control->processed.load();}
 - (BOOL)formatUnsupported{return _control->unsupported.load();}
 - (AVAudioMix *)mixForTrack:(AVAssetTrack *)track{
  Context *c=new Context{_control};
