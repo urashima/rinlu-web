@@ -1,0 +1,51 @@
+name: Mobile API gateway preflight
+on:
+  pull_request:
+    paths:
+      - 'services/mobile-gateway/**'
+      - 'scripts/package-platform.mjs'
+      - '.github/workflows/mobile-gateway-ci.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  mobile-gateway-preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Unit tests for mobile gateway session safety and response schemas
+        run: |
+          set -euo pipefail
+          node --check services/mobile-gateway/mobile-api.mjs
+          node --test services/mobile-gateway/mobile-api.test.mjs
+      - name: Verify current canonical source
+        run: node scripts/prepare-platform.mjs
+      - name: Build website and package with gateway overlay
+        run: |
+          set -euo pipefail
+          npm install --global pnpm@11.25.0
+          cd .platform-source/rinlu-player-source
+          pnpm install --frozen-lockfile
+          node scripts/tests/platform-gateway.test.mjs
+          pnpm exec vite build --config deployment/platform/vite.config.mjs
+          cd ../..
+          node scripts/package-platform.mjs
+          node --check platform-runtime/server.mjs
+          node --check platform-runtime/mobile-api.mjs
+          test -f platform-runtime/public/source/mobile-api-gateway.mjs
+          grep -q 'mobile-api.mjs' platform-runtime/Dockerfile
+          grep -q "api/mobile/v1/" platform-runtime/server.mjs
+          python3 - <<'PY'
+          import json, pathlib, hashlib
+          p=pathlib.Path('platform-runtime')
+          release=json.loads((p/'public/_release.json').read_text())
+          code=(p/'server.mjs').read_bytes()
+          assert hashlib.sha256(code).hexdigest()==release['gateway_overlay_sha256']
+          assert len(release['source_sha256'])==64
+          assert release['gateway_overlay']=='rinlu-mobile-api-v1'
+          print('Gateway overlay + canonical source hash verified')
+          PY
