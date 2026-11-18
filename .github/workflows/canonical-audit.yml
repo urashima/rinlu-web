@@ -34,6 +34,34 @@ jobs:
           Path('.platform-source/audit-index.json').write_text(json.dumps(
             {'files':paths,'matched':wanted},indent=2,ensure_ascii=False),encoding='utf-8')
           PY
+      - name: Apply native mobile API overlay in isolated canonical checkout
+        run: |
+          node --check scripts/apply-mobile-overlay.mjs
+          node scripts/apply-mobile-overlay.mjs .platform-source/rinlu-player-source
+          python3 - <<'PY'
+          from pathlib import Path
+          root=Path('.platform-source/rinlu-player-source')
+          server=(root/'lib/server.ts').read_text()
+          module=(root/'lib/mobile-api.ts').read_text()
+          assert "resource==='mobile'&&p[1]==='v1'" in server
+          assert 'mobileAPI' in server and 'listenerSoundPolicy' in module
+          assert 'bootstrap' in module and 'search' in module
+          print('Verified mobile route registration and policy inclusion')
+          PY
+      - name: Check patched server TypeScript and business tests
+        run: |
+          npm install --global pnpm@11.25.0
+          cd .platform-source/rinlu-player-source
+          pnpm install --frozen-lockfile
+          pnpm exec tsc --noEmit
+          node scripts/tests/sound-policy-integration.mjs
+      - name: Package patch files for canonical Sites handoff
+        run: |
+          mkdir -p .platform-source/native-mobile-patch/lib
+          cp .platform-source/rinlu-player-source/lib/mobile-api.ts .platform-source/native-mobile-patch/lib/
+          cp .platform-source/rinlu-player-source/lib/server.ts .platform-source/native-mobile-patch/lib/
+          cp services/mobile-api/mobile-api.ts .platform-source/native-mobile-patch/mobile-api-source.ts
+          (cd .platform-source && zip -qr native-mobile-patch.zip native-mobile-patch)
       - uses: actions/upload-artifact@v4
         with:
           name: rinlu-verified-public-source-for-native-integration
@@ -41,3 +69,8 @@ jobs:
             .platform-source/release.tar.gz
             .platform-source/audit-index.json
           retention-days: 2
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rinlu-ios-native-mobile-api-patch
+          path: .platform-source/native-mobile-patch.zip
+          retention-days: 14
