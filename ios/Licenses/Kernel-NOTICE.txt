@@ -16,3 +16,7 @@ Modifications: ESM dependency registry instead of a shared global; constructor/p
 conversion to classes; renamed stage APIs; comments consolidated here; arithmetic order and
 32-bit rounding preserved. Generator: scripts/rebuild-rinlu-kernel.mjs.
 No warranty; see the AGPL license. All covered derivative sources remain under AGPL-3.0-or-later.
+
+2026-11-18 iOS port. RINLU translated the kernel to C++17, generated native
+parameter tables for 44100 and 48000 Hz, and integrated the processor into
+Apple's MediaToolbox tap. The compiled app's sample path contains no JavaScript.

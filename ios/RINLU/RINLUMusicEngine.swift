@@ -31,6 +31,44 @@ final class RINLUMusicEngine: ObservableObject {
     private var retryCount = 0
     private var eventSent = false
 
+    private var accountScope: String?
+    private var lastCheckpoint = -1
+    private var restored = false
+    private struct Checkpoint: Codable {
+        let queue: [String]
+        let selected: String
+        let seconds: Double
+    }
+    private var checkpointKey: String { "rinlu.queue." + (accountScope ?? "guest") }
+
+    func syncLibrary(_ songs: [RINLUSong], account: String?) {
+        let scope = account ?? "guest"
+        if let prior = accountScope, prior != scope {
+            checkpoint()
+            wantsPlay = false; generation = UUID()
+            itemStatus = nil; player.replaceCurrentItem(with: nil)
+            track = nil; queue = []; assetTrack = nil; tap = nil; artwork = nil
+            playing = false; loading = false; error = nil; restored = false
+            MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
+        }
+        accountScope = scope
+        guard !restored, track == nil, !songs.isEmpty else { return }
+        restored = true
+        guard let data = UserDefaults.standard.data(forKey: checkpointKey),
+              let saved = try? JSONDecoder().decode(Checkpoint.self, from: data),
+              let selected = songs.first(where: { $0.id == saved.selected }) else { return }
+        let catalog = Dictionary(songs.map { ($0.id,$0) }, uniquingKeysWith: { first,_ in first })
+        queue = saved.queue.compactMap { catalog[$0] }
+        if queue.isEmpty { queue = [selected] }
+        track = selected; duration = selected.duration ?? 0
+        position = min(max(saved.seconds,0),duration); publish()
+    }
+    private func checkpoint() {
+        guard accountScope != nil, let track, position.isFinite else { return }
+        let saved = Checkpoint(queue: queue.prefix(300).map(\.id), selected: track.id, seconds: position)
+        if let data = try? JSONEncoder().encode(saved) { UserDefaults.standard.set(data,forKey:checkpointKey) }
+    }
+
     init() {
         timer = player.addPeriodicTimeObserver(forInterval: CMTime(seconds: 0.4, preferredTimescale: 600), queue: .main) { [weak self] _ in
             Task { @MainActor in self?.tick() }
@@ -100,7 +138,7 @@ final class RINLUMusicEngine: ObservableObject {
         saveEvent(completed: false)
         eventID = UUID(); listened = 0; eventSent = false; previousTime = nil; retryCount = 0
         artwork = nil; queue = songs ?? [song]; track = song; duration = song.duration ?? 0
-        wantsPlay = true
+        wantsPlay = true; lastCheckpoint = -1
         await load(song, from: 0)
     }
     private func load(_ song: RINLUSong, from seconds: Double) async {
@@ -142,16 +180,16 @@ final class RINLUMusicEngine: ObservableObject {
     }
     func resume() {
         guard track != nil else { return }; wantsPlay = true
-        if let song = track, error != nil, player.currentItem == nil || player.currentItem?.status == .failed {
+        if let song = track, (!loading && player.currentItem == nil) || player.currentItem?.status == .failed {
             Task { await load(song, from: position) }; return
         }
         do { let s = AVAudioSession.sharedInstance(); try s.setCategory(.playback); try s.setActive(true); player.play(); tick() }
         catch { self.error = error.localizedDescription; pause() }
     }
-    func pause() { wantsPlay = false; player.pause(); loading = false; playing = false; previousTime = nil; publish() }
+    func pause() { wantsPlay = false; player.pause(); loading = false; playing = false; previousTime = nil; checkpoint(); publish() }
     func toggle() { wantsPlay ? pause() : resume() }
     func seek(to t: Double) {
-        guard t.isFinite, player.currentItem != nil else { return }
+        guard t.isFinite else { return }
         previousTime = nil; position = min(max(t,0),duration); player.seek(to: CMTime(seconds: position, preferredTimescale: 600)); publish()
     }
     private var index: Int { queue.firstIndex { $0.id == track?.id } ?? 0 }
@@ -168,6 +206,7 @@ final class RINLUMusicEngine: ObservableObject {
             if playing, let last = previousTime, (0...1.5).contains(t-last) { listened += t-last }
             position = t; previousTime = playing ? t : nil
         }
+        if playing, Int(position)/5 != lastCheckpoint { lastCheckpoint = Int(position)/5; checkpoint() }
         if tap?.formatUnsupported == true && dspEnabled { error = "Original audio · DSP requires 44.1 or 48 kHz mono/stereo PCM." }
         publish()
     }

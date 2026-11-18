@@ -75,7 +75,7 @@ struct RINLUNativeRootView: View {
             }.tabItem { Label("Library",systemImage:"square.stack.fill") }
         }
         .tint(.pink)
-        .task { await refresh() }
+        .task { await BusinessPage.restoreSession(); await refresh() }
         .onChange(of: phase) { phase in if phase == .active && portal == nil { Task { await refresh() } } }
         .sheet(isPresented:$expanded) {
             if let song=audio.track { PlayerSheet(audio:audio,store:store,song:song).presentationDragIndicator(.visible) }
@@ -101,7 +101,7 @@ struct RINLUNativeRootView: View {
         }
     }
     private func web(_ path:String,_ title:String){ portal=Portal(path:path,title:title) }
-    private func refresh() async { await store.refresh(); audio.apply(store.dspPolicy) }
+    private func refresh() async { await store.refresh(); audio.apply(store.dspPolicy); audio.syncLibrary(store.catalog, account:store.account?.id) }
     private func empty(_ title:String)->some View { Text(title).foregroundStyle(.secondary).padding(.vertical,12) }
     private func page<Content:View>(_ title:String,@ViewBuilder content:()->Content)->some View {
         NavigationStack {

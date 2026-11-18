@@ -34,3 +34,14 @@ jobs:
         with:
           name: Listening-Simulator
           path: ${{ runner.temp }}/Listening.xcresult
+      - name: Export UI screenshots
+        if: always()
+        run: |
+          if test -d "$RUNNER_TEMP/Listening.xcresult"; then
+            xcrun xcresulttool export attachments --path "$RUNNER_TEMP/Listening.xcresult" --output-path "$RUNNER_TEMP/listening-screens"
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Listening-Screens
+          path: ${{ runner.temp }}/listening-screens/*.png

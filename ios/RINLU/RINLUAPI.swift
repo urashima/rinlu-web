@@ -34,8 +34,6 @@ struct RINLULibrary: Decodable {
     let history: [RINLUSong]
     let playlists: [RINLUPlaylist]
 }
-struct RINLUStudio: Decodable { let tracks: [RINLUSong] }
-struct RINLUAdmin: Decodable { let tracks: [RINLUSong] }
 struct RINLUAuthorizedMedia: Decodable {
     let url: String
     let expires_at: Double
@@ -67,21 +65,6 @@ struct RINLUDSPPolicy: Decodable {
     let default_on: Bool
     let active: RINLUActivePreset
 }
-struct RINLUHighwayEvent: Decodable {
-    let time: Int
-    let lane: Int
-    let kind: String
-}
-struct RINLUHighwayLevel: Decodable {
-    let version: String
-    let duration: Int
-    let events: [RINLUHighwayEvent]
-}
-struct RINLUHighwayResponse: Decodable {
-    let level: RINLUHighwayLevel
-    let hash: String
-}
-
 enum RINLUServiceError: LocalizedError {
     case invalidResponse
     case backend(Int, String)
@@ -98,7 +81,6 @@ enum RINLUServiceError: LocalizedError {
 final class RINLUAPI {
     static let shared = RINLUAPI()
     static let site = URL(string: "https://rinlu.com/music/")!
-    private let decoder = JSONDecoder()
     private let session: URLSession
 
     private init() {
@@ -147,24 +129,10 @@ final class RINLUAPI {
             throw RINLUServiceError.backend(response.statusCode,
                 detail?["error"] as? String ?? "服务暂不可用")
         }
-        do { return try decoder.decode(type, from: data) }
+        do { return try JSONDecoder().decode(type, from: data) }
         catch { throw RINLUServiceError.invalidResponse }
     }
 
-    func login(email: String, password: String) async throws {
-        let _: [String: Bool] = try await post("accounts/login",
-            payload: ["email": email, "password": password])
-    }
-    func register(name: String, email: String, password: String) async throws {
-        let _: [String: Bool] = try await post("accounts/register",
-            payload: ["name": name, "email": email, "password": password])
-    }
-    func logout() async throws {
-        let _: [String: Bool] = try await post("accounts/logout", payload: [:])
-        HTTPCookieStorage.shared.cookies?.forEach { cookie in
-            if cookie.domain.contains("rinlu.com") { HTTPCookieStorage.shared.deleteCookie(cookie) }
-        }
-    }
     func setFavorite(trackID: String, active: Bool) async throws {
         let _: [String: Bool] = try await post("favorites",
             payload: ["track_id": trackID, "active": active])
@@ -188,8 +156,6 @@ final class RINLUStore: ObservableObject {
     @Published var favorites: Set<String> = []
     @Published var history: [RINLUSong] = []
     @Published var playlists: [RINLUPlaylist] = []
-    @Published var studioTracks: [RINLUSong] = []
-    @Published var reviewTracks: [RINLUSong] = []
     @Published var dspPolicy: RINLUDSPPolicy?
     @Published var error: String?
     @Published var busy = false
@@ -213,30 +179,12 @@ final class RINLUStore: ObservableObject {
     }
 
     func refreshPrivate() async {
-        guard let user = account else { return }
+        guard account != nil else { return }
         do {
             let library: RINLULibrary = try await RINLUAPI.shared.get("library")
             favorites = Set(library.favorites)
             history = library.history
             playlists = library.playlists
-        } catch { self.error = error.localizedDescription }
-        if ["artist", "admin"].contains(user.role ?? "") {
-            if let studio: RINLUStudio = try? await RINLUAPI.shared.get("studio") {
-                studioTracks = studio.tracks
-            }
-        }
-        if ["admin", "reviewer"].contains(user.role ?? "") {
-            if let admin: RINLUAdmin = try? await RINLUAPI.shared.get("admin") {
-                reviewTracks = admin.tracks
-            }
-        }
-    }
-
-    func login(email: String, password: String) async {
-        busy = true; defer { busy = false }
-        do {
-            try await RINLUAPI.shared.login(email: email, password: password)
-            await refresh()
         } catch { self.error = error.localizedDescription }
     }
 

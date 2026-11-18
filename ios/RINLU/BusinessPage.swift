@@ -10,6 +10,16 @@ struct BusinessPage: UIViewControllerRepresentable {
     static func platformCookie(_ c:HTTPCookie)->Bool {
         c.domain.trimmingCharacters(in:CharacterSet(charactersIn:".")) == "rinlu.com"
     }
+    static func restoreSession() async {
+        let jar = WKWebsiteDataStore.default().httpCookieStore
+        if !UserDefaults.standard.bool(forKey:"rinlu.web-session-migrated") {
+            if await jar.allCookies().filter(platformCookie).isEmpty {
+                for c in (HTTPCookieStorage.shared.cookies ?? []).filter(platformCookie) { await jar.setCookie(c) }
+            }
+            UserDefaults.standard.set(true,forKey:"rinlu.web-session-migrated")
+        }
+        await importSession()
+    }
     static func importSession() async {
         let web = await WKWebsiteDataStore.default().httpCookieStore.allCookies().filter(platformCookie)
         let native=HTTPCookieStorage.shared
@@ -66,12 +76,7 @@ struct BusinessPage: UIViewControllerRepresentable {
         view.addSubview(stack)
         NSLayoutConstraint.activate([stack.topAnchor.constraint(equalTo:view.safeAreaLayoutGuide.topAnchor),stack.bottomAnchor.constraint(equalTo:view.bottomAnchor),stack.leadingAnchor.constraint(equalTo:view.leadingAnchor),stack.trailingAnchor.constraint(equalTo:view.trailingAnchor)])
         back.isHidden=true;retry.isHidden=true;spinner.startAnimating()
-        Task {
-            let jar=config.websiteDataStore.httpCookieStore, cookies=(HTTPCookieStorage.shared.cookies ?? []).filter(BusinessPage.platformCookie)
-            for c in await jar.allCookies().filter(BusinessPage.platformCookie) where !cookies.contains(where:{$0.name==c.name && $0.path==c.path && $0.domain==c.domain}) {await jar.deleteCookie(c)}
-            for c in cookies {await jar.setCookie(c)}
-            ready=true;reload()
-        }
+        ready=true;reload()
     }
     @objc private func reload(){guard ready else{return};if web.url != nil {web.reload()}else{web.load(URLRequest(url:RINLUAPI.site.appendingPathComponent(path)))}}
     @objc private func goBack(){web.goBack()}
