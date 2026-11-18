@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later. RINLU native port, 2026.
 #pragma once
 #include "Stages.hpp"
+#include "Convolver.hpp"
 #include <array>
 struct Sound {
  int bands=10; bool refined=false;
@@ -47,7 +48,7 @@ class Processor {
  std::vector<Section> sections;
  std::vector<Filter> extended;
  History dry[2]={History(16),History(16)},up[2]={History(65),History(65)},down[2]={History(65),History(65)};
- History fir[2],firDelay[2]={History(128),History(128)},look[2];
+ Convolver fir[2]; History look[2];
  Envelope envelope[2]; Filter bassFilter;
  double ix1[2]{},ix2[2]{},oy1[2]{},oy2[2]{},low[2]{},harmDC[2]{},tubeDC[2]{},deLow[2]{},cross[2]{};
  double deEnv=0,compressEnv=0,power=0,levelAlpha,levelComplement,lp,dcLp,deLp,crossLp,attack,release,pan[2],master,bal[2];
@@ -55,7 +56,7 @@ class Processor {
 public:
  Processor(int fs,const Sound& settings):s(settings),rate(fs),frames(fs/100),block(2*frames),output(2*frames),
  table(fs==44100?rate44100:rate48000),clarity(table[midi(s.clarity/.6)]),room(table[midi(s.room/.035)]),wide(table[midi(clampReal((s.width-1)/.08,0,10))]),bass(table[midi(s.bass/.8)]),dynamic(table[midi(s.boost*10)]),
- plate(fs,room.roomsize),fir{History(int(s.fir.size())),History(int(s.fir.size()))},look{History(int(dynamic.delay)),History(int(dynamic.delay))},bassFilter{bass.b0,bass.b1,bass.b2,bass.a2}{
+ plate(fs,room.roomsize),fir{Convolver(s.fir),Convolver(s.fir)},look{History(int(dynamic.delay)),History(int(dynamic.delay))},bassFilter{bass.b0,bass.b1,bass.b2,bass.a2}{
   const double centers[]={62.5,115.734,214.311,396.85,734.867,1360.79,2519.84,4666.12,8640.48,16000};
   double ratio=pow(256,1./9);
   for(int i=0;i<s.bands;++i){
@@ -116,7 +117,7 @@ private:
    if(s.crossfeed){for(int c=0;c<2;++c)cross[c]+=crossLp*(v[c]-cross[c]);for(int c=0;c<2;++c)v[c]=(v[c]+s.crossfeed*cross[1-c])/(1+s.crossfeed);}
    double peak=max(std::abs(v[0]),std::abs(v[1])),g=1;compressEnv=peak+(compressEnv-peak)*(peak>compressEnv?attack:release);
    if(s.compression){double over=20*log10(max(compressEnv,1e-12))+12+12*s.compression,factor=1/(1+5*s.compression)-1;g=pow(10,(over<=-3?0:over<3?factor*(over+3)*(over+3)/12:factor*over)/20);}
-   for(int c=0;c<2;++c)v[c]=firDelay[c].delay(fir[c].filter(v[c]*g*pan[c],s.fir.data()));
+   for(int c=0;c<2;++c)v[c]=fir[c].tick(v[c]*g*pan[c]);
    if(!s.refined){v[0]=f32(v[0]);v[1]=f32(v[1]);}
    double sq=s.refined?(v[0]*v[0]+v[1]*v[1])*.5:f32(v[0]*v[0]);power=power*levelComplement+sq*levelAlpha;
    double rms=s.refined?sqrt(power):f32(sqrt(power)),boost=dynamic.gainBoost;

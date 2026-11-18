@@ -1,5 +1,8 @@
 name: RINLU hybrid iOS
 on:
+  pull_request:
+    branches: ['feature/rinlu-ios-native-v0.3']
+    paths: ['ios/**', '.github/workflows/ios-hybrid.yml']
   push:
     branches: ['feature/rinlu-ios-hybrid-v0.4']
 permissions:

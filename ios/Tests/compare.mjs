@@ -2,7 +2,7 @@ import {RinluDSP,normalizeRinlu} from './reference/core.js';
 import {spawnSync} from 'node:child_process';
 import assert from 'node:assert/strict';
 const configs=[{}, {clarity:1.2,boost:.1,bass:.8}, {clarity:1.8,boost:.15,gains:[0,0,-.5,-1,0,.5,1,.5,0,-.5]}, {bass:1.6,clarity:.9,boost:.2},{clarity:.6,width:1.24,room:.14,boost:.05},{crossfeed:.12},{warmth:.3,bass:1},{compression:.45,leveling:.25,preamp:-2}];
-for(let i=0;i<9;i++)configs.push({bands:[10,15,25,31][i%4],gains:Array.from({length:31},(_,j)=>Math.sin(j+.3+i*.19)*3),pan:.2,balance:-2,normalization:-8,harmonics:.6,clarity:2.5,width:i%2?.7:1.55,room:.2,decay:.62,q:1.6,compression:.6,deesser:.7,bass:2,warmth:.4,leveling:.35,boost:.24,crossfeed:.12,fir:[.8,.2,-.03]});
+for(let i=0;i<9;i++)configs.push({bands:[10,15,25,31][i%4],gains:Array.from({length:31},(_,j)=>Math.sin(j+.3+i*.19)*3),pan:.2,balance:-2,normalization:-8,harmonics:.6,clarity:2.5,width:i%2?.7:1.55,room:.2,decay:.62,q:1.6,compression:.6,deesser:.7,bass:2,warmth:.4,leveling:.35,boost:.24,crossfeed:.12,fir:i===8?Array.from({length:2048},(_,j)=>j===0?.8:Math.sin(j*.05)*Math.exp(-j/320)*.003):[.8,.2,-.03]});
 let worst=0, count=0;
 for(const rate of [44100,48000])for(const quality of ['aligned','refined'])for(const patch of configs){
  const s=normalizeRinlu({...patch,quality}), frames=8192, inL=new Float32Array(frames),inR=inL.slice(),l=inL.slice(),r=l.slice();
