@@ -214,16 +214,17 @@ jobs:
           assert(selected,'No approved catalog recording found');
           const {track,cfg}=selected;
           const url=base+'/api/games/native-highway/'+track.id+'?difficulty=normal&revision='+cfg.stored_revision;
-          async function read(){
+          async function read(expectDatabase=false){
             const res=await fetch(url,{method:'POST',headers:{Origin:origin}});
             if(res.status===202)return null;
             assert.equal(res.status,200,'Chart endpoint '+res.status);
+            if(expectDatabase)assert.equal(res.headers.get('x-rinlu-chart-source'),'database');
             return res.json();
           }
           let bundle;
           for(let i=0;i<40&&!bundle;i++){bundle=await read();if(!bundle)await new Promise(r=>setTimeout(r,2000));}
           assert(bundle?.level?.version==='LevelIRV1' && bundle.features.frames.length && bundle.level.events.length);
-          const second=await read();
+          const second=await read(true);
           assert.equal(second?.level?.canonicalHash,bundle.level.canonicalHash);
           console.log('Verified shared chart:',track.title,bundle.level.events.length,bundle.level.canonicalHash);
           JS
