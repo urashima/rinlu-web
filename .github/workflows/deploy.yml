@@ -196,3 +196,34 @@ jobs:
           assert 'href="/music/privacy?lang=en"' in root_en, 'English homepage footer link missing'
           print('PUBLIC HTTPS VALIDATION PASSED: bilingual privacy and footers')
           PY
+
+      - name: Verify embedded Highway and shared catalog chart
+        if: steps.platform.outputs.changed == 'true'
+        run: |
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+          const origin='https://rinlu.com', base=origin+'/music';
+          const shell=await (await fetch(base+'/pulse-highway/index.html')).text();
+          assert(shell.includes('id="start-game"') && !shell.includes('band-legend') && !shell.includes('Play original demo'));
+          const catalog=await (await fetch(base+'/api/catalog')).json();
+          let selected;
+          for(const track of catalog.tracks??[]){
+            const cfg=await (await fetch(base+'/api/games/config/'+track.id)).json();
+            if(cfg.highway){selected={track,cfg};break;}
+          }
+          assert(selected,'No approved catalog recording found');
+          const {track,cfg}=selected;
+          const url=base+'/api/games/native-highway/'+track.id+'?difficulty=normal&revision='+cfg.stored_revision;
+          async function read(){
+            const res=await fetch(url,{method:'POST',headers:{Origin:origin}});
+            if(res.status===202)return null;
+            assert.equal(res.status,200,'Chart endpoint '+res.status);
+            return res.json();
+          }
+          let bundle;
+          for(let i=0;i<40&&!bundle;i++){bundle=await read();if(!bundle)await new Promise(r=>setTimeout(r,2000));}
+          assert(bundle?.level?.version==='LevelIRV1' && bundle.features.frames.length && bundle.level.events.length);
+          const second=await read();
+          assert.equal(second?.level?.canonicalHash,bundle.level.canonicalHash);
+          console.log('Verified shared chart:',track.title,bundle.level.events.length,bundle.level.canonicalHash);
+          JS
