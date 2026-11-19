@@ -9,7 +9,8 @@ if ss -H -ltn '( sport = :80 )' | grep -q . && ! docker ps --format '{{.Names}}'
 fi
 [[ -f "$DIR/platform-runtime/public/_release.json" ]] || { echo 'Missing verified platform release.' >&2; exit 1; }
 RELEASE="$(date -u +%Y%m%dT%H%M%SZ)"
-OLD_WEB=''; OLD_PLATFORM=''
+OLD_WEB=''; OLD_PLATFORM=''; OLD_CHARTS=''
+if docker inspect rinlu-charts >/dev/null 2>&1; then OLD_CHARTS="$(docker inspect -f '{{.Image}}' rinlu-charts)"; fi
 if docker inspect rinlu-web >/dev/null 2>&1; then OLD_WEB="$(docker inspect -f '{{.Image}}' rinlu-web)"; fi
 if docker inspect rinlu-platform >/dev/null 2>&1; then OLD_PLATFORM="$(docker inspect -f '{{.Image}}' rinlu-platform)"; fi
 # Build both images before altering running containers.
@@ -25,17 +26,20 @@ if [[ -f "$google_env" && ! -L "$google_env" ]]; then
 fi
 [[ -s /etc/rinlu/google.env ]]
 start_platform(){ docker run -d --name rinlu-platform --network rinlu-music --restart unless-stopped --read-only --tmpfs /tmp:size=16m --memory 256m --cpus 1 --pids-limit 100 --cap-drop ALL --security-opt no-new-privileges --env-file /etc/rinlu/google.env -e NODE_ENV=production "$1" >/dev/null; }
+start_charts(){ docker run -d --name rinlu-charts --network rinlu-music --restart unless-stopped --read-only --tmpfs /tmp:size=768m,mode=1777 --memory 1536m --cpus 0.75 --cpu-shares 128 --pids-limit 100 --cap-drop ALL --security-opt no-new-privileges -e NODE_ENV=production "$1" >/dev/null; }
 start_web(){ docker run -d --name rinlu-web --network rinlu-music --restart unless-stopped --memory 256m --cpus 0.5 --security-opt no-new-privileges -p 0.0.0.0:80:80 "$1" >/dev/null; }
 rollback(){
  echo 'Deployment failed; restoring the previous containers.' >&2
  docker logs --tail 30 rinlu-platform >&2 || true
  docker logs --tail 30 rinlu-web >&2 || true
- docker rm -f rinlu-web rinlu-platform >/dev/null 2>&1 || true
+ docker rm -f rinlu-web rinlu-platform rinlu-charts >/dev/null 2>&1 || true
+ if [[ -n "$OLD_CHARTS" ]]; then start_charts "$OLD_CHARTS" || true; fi
  if [[ -n "$OLD_PLATFORM" ]]; then start_platform "$OLD_PLATFORM" || true; fi
  if [[ -n "$OLD_WEB" ]]; then start_web "$OLD_WEB" || true; fi
 }
 trap rollback ERR
-docker rm -f rinlu-web rinlu-platform >/dev/null 2>&1 || true
+docker rm -f rinlu-web rinlu-platform rinlu-charts >/dev/null 2>&1 || true
+start_charts "rinlu-platform:$RELEASE"
 start_platform "rinlu-platform:$RELEASE"
 start_web "rinlu-web:$RELEASE"
 healthy=0
