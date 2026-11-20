@@ -20,10 +20,14 @@ await cp(source + '/platform-dist', runtime + '/public', {recursive: true});
 // OVH-only read-only mobile API: the canonical Sites/D1 source remains untouched.
 // The gateway's additional corresponding source is published separately.
 const brandSource=await readFile('scripts/apply-platform-brand.mjs','utf8');
+const directOverlaySource=await readFile('scripts/apply-platform-direct.mjs','utf8');
+const directOverlayHash=createHash('sha256').update(directOverlaySource).digest('hex');
 const brandOverlayHash=createHash('sha256').update(brandSource).digest('hex');
 const mobileSource=await readFile('services/mobile-gateway/mobile-api.mjs','utf8');
 const s3Source=await readFile('services/ovh-s3/s3.mjs','utf8');
 const bridgeSource=await readFile('services/ovh-s3/storage-gateway.mjs','utf8');
+const directSource=await readFile('services/ovh-s3/direct-storage.mjs','utf8');
+const signingSource=await readFile('services/ovh-s3/signing.mjs','utf8');
 const gatewayPath=runtime+'/server.mjs', gatewayOriginal=await readFile(gatewayPath,'utf8');
 const gatewayImport="import {pathToFileURL} from 'node:url';";
 const gatewayServer=" return http.createServer(async(req,res)=>";
@@ -43,16 +47,20 @@ await writeFile(gatewayPath,gatewayPatched);
 await writeFile(runtime+'/mobile-api.mjs',mobileSource);
 await writeFile(runtime+'/ovh-s3.mjs',s3Source);
 await writeFile(runtime+'/storage-gateway.mjs',bridgeSource);
+await writeFile(runtime+'/direct-storage.mjs',directSource);
+await writeFile(runtime+'/signing.mjs',signingSource);
 const dockerPath=runtime+'/Dockerfile',dockerOriginal=await readFile(dockerPath,'utf8');
 const dockerAnchor='COPY --chown=node:node server.mjs ./server.mjs';
 if(!dockerOriginal.includes(dockerAnchor)||dockerOriginal.includes('mobile-api.mjs')||dockerOriginal.includes('ovh-s3.mjs')) {
   throw Error('Canonical Dockerfile changed; abort production packaging');
 }
 await writeFile(dockerPath,dockerOriginal.replace(dockerAnchor,
-  dockerAnchor+'\nCOPY --chown=node:node mobile-api.mjs ./mobile-api.mjs\nCOPY --chown=node:node ovh-s3.mjs ./ovh-s3.mjs\nCOPY --chown=node:node storage-gateway.mjs ./storage-gateway.mjs'));
+  dockerAnchor+'\nCOPY --chown=node:node mobile-api.mjs ./mobile-api.mjs\nCOPY --chown=node:node ovh-s3.mjs ./ovh-s3.mjs\nCOPY --chown=node:node storage-gateway.mjs ./storage-gateway.mjs\nCOPY --chown=node:node direct-storage.mjs ./direct-storage.mjs\nCOPY --chown=node:node signing.mjs ./signing.mjs'));
 const gatewayOverlayHash=createHash('sha256').update(gatewayPatched).digest('hex');
 const enrichedRelease={...release,gateway_overlay_sha256:gatewayOverlayHash,
-  gateway_overlay:'rinlu-mobile-api-v1-ovh-s3-v1',
+  gateway_overlay:'rinlu-mobile-api-v1-ovh-s3-v2',
+  direct_overlay_sha256:directOverlayHash,
+  direct_overlay:'s3-browser-direct-v1',
   brand_overlay_sha256:brandOverlayHash,
   brand_overlay:'madimi-one-wordmark-v1'};
 await writeFile(runtime+'/public/_release.json',JSON.stringify(enrichedRelease)+'\n');
@@ -78,8 +86,14 @@ await writeFile(destination+'/mobile-api-gateway.sha256',
   createHash('sha256').update(mobileSource).digest('hex')+'  mobile-api-gateway.mjs\n');
 await writeFile(destination+'/ovh-s3.mjs',s3Source);
 await writeFile(destination+'/storage-gateway.mjs',bridgeSource);
+await writeFile(destination+'/direct-storage.mjs',directSource);
+await writeFile(destination+'/signing.mjs',signingSource);
+await writeFile(destination+'/browser-direct-overlay.mjs',directOverlaySource);
+await writeFile(destination+'/browser-direct-overlay.sha256',directOverlayHash+'  browser-direct-overlay.mjs\n');
 await writeFile(destination+'/ovh-s3.sha256',createHash('sha256').update(s3Source).digest('hex')+'  ovh-s3.mjs\n');
 await writeFile(destination+'/storage-gateway.sha256',createHash('sha256').update(bridgeSource).digest('hex')+'  storage-gateway.mjs\n');
+await writeFile(destination+'/direct-storage.sha256',createHash('sha256').update(directSource).digest('hex')+'  direct-storage.mjs\n');
+await writeFile(destination+'/signing.sha256',createHash('sha256').update(signingSource).digest('hex')+'  signing.mjs\n');
 await writeFile(destination + '/manifest.json', JSON.stringify({
   release: release.release,
   sha256: release.source_sha256,
