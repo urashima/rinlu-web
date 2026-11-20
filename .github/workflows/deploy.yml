@@ -37,6 +37,12 @@ jobs:
           set -euo pipefail
           node --test services/mobile-gateway/mobile-api.test.mjs
 
+      - name: Verify Madimi One wordmark overlay
+        if: steps.platform.outputs.changed == 'true'
+        run: |
+          node --check scripts/apply-platform-brand.mjs
+          node --test scripts/test-platform-brand.mjs
+
       - name: Build the complete platform client and gateway
         if: steps.platform.outputs.changed == 'true'
         run: |
