@@ -45,7 +45,15 @@ const gatewayPatched=gatewayOriginal
   .replace(gatewayProxy,
     "  if(local.startsWith('/api/mobile/v1/'))return await mobileApi(req,res,url,accountBearer(req),send);\n  if(local.startsWith('/api/')){if(s3Bridge&&await s3Bridge.handle(req,res,local,url))return;return await proxy(req,res,local+url.search);}" )
   .replace(gatewayMediaHeaders,gatewayMediaHeaders+"\n   if(path.startsWith('/api/media/')&&response.headers.has('content-length'))res.setHeader('Content-Length',response.headers.get('content-length'));");
-await writeFile(gatewayPath,gatewayPatched);
+// The sharing extension is independent of the canonical platform archive.
+const shareStart=/ return http\.createServer\(async\(req,res\)=>\s*\{/;
+if(!shareStart.test(gatewayPatched))throw Error('Canonical request handler changed; share extension not applied');
+const shareGateway=gatewayPatched
+ .replace(gatewayImport,gatewayImport+"\nimport {createSharePreview} from './share-preview.mjs';")
+ .replace(gatewayServer," const shareHandler=createSharePreview({s3:createOvhS3(process.env),backendOrigin,publicOrigin,accountBearer});\n"+gatewayServer)
+ .replace(shareStart,match=>match+"\n  if(await shareHandler(req,res))return;");
+await writeFile(gatewayPath,shareGateway);
+await cp('services/share-preview/share-preview.mjs',runtime+'/share-preview.mjs');
 await writeFile(runtime+'/mobile-api.mjs',mobileSource);
 await writeFile(runtime+'/ovh-s3.mjs',s3Source);
 await writeFile(runtime+'/storage-gateway.mjs',bridgeSource);
@@ -58,8 +66,8 @@ if(!dockerOriginal.includes(dockerAnchor)||dockerOriginal.includes('mobile-api.m
   throw Error('Canonical Dockerfile changed; abort production packaging');
 }
 await writeFile(dockerPath,dockerOriginal.replace(dockerAnchor,
-  dockerAnchor+'\nCOPY --chown=node:node mobile-api.mjs ./mobile-api.mjs\nCOPY --chown=node:node ovh-s3.mjs ./ovh-s3.mjs\nCOPY --chown=node:node storage-gateway.mjs ./storage-gateway.mjs\nCOPY --chown=node:node direct-storage.mjs ./direct-storage.mjs\nCOPY --chown=node:node signing.mjs ./signing.mjs\nCOPY --chown=node:node cdn-signer.mjs ./cdn-signer.mjs'));
-const gatewayOverlayHash=createHash('sha256').update(gatewayPatched).digest('hex');
+  dockerAnchor+'\nCOPY --chown=node:node share-preview.mjs ./share-preview.mjs\nCOPY --chown=node:node mobile-api.mjs ./mobile-api.mjs\nCOPY --chown=node:node ovh-s3.mjs ./ovh-s3.mjs\nCOPY --chown=node:node storage-gateway.mjs ./storage-gateway.mjs\nCOPY --chown=node:node direct-storage.mjs ./direct-storage.mjs\nCOPY --chown=node:node signing.mjs ./signing.mjs\nCOPY --chown=node:node cdn-signer.mjs ./cdn-signer.mjs'));
+const gatewayOverlayHash=createHash('sha256').update(shareGateway).digest('hex');
 const enrichedRelease={...release,gateway_overlay_sha256:gatewayOverlayHash,
   gateway_overlay:'rinlu-mobile-api-v1-ovh-s3-v2',
   direct_overlay_sha256:directOverlayHash,
@@ -79,9 +87,17 @@ await cp('scripts/privacy-footer.js', runtime + '/public/privacy-footer.js');
 await writeFile(indexPath, indexHtml.replace('</body>', '<script defer src="/music/privacy-footer.js"></script>\n</body>'));
 
 
+// Inject a tiny admin navigation script; OG metadata is rendered by the gateway at request time.
+const shareIndex=await readFile(indexPath,'utf8');
+if(shareIndex.includes('/music/share-admin.js'))throw Error('Duplicate share admin script');
+await cp('scripts/share-admin.js',runtime+'/public/share-admin.js');
+await writeFile(indexPath,shareIndex.replace('</body>','<script defer src="/music/share-admin.js"></script>\n</body>'));
+
 const destination = runtime + '/public/source';
 await mkdir(destination, {recursive: true});
 await cp(archivePath, destination + '/rinlu-player-source.tar.gz');
+await cp('services/share-preview/share-preview.mjs',destination+'/share-preview.mjs');
+await cp('scripts/share-admin.js',destination+'/share-admin.js');
 await writeFile(destination+'/brand-wordmark-overlay.mjs',brandSource);
 await writeFile(destination+'/brand-wordmark-overlay.sha256',brandOverlayHash+'  brand-wordmark-overlay.mjs\n');
 await writeFile(destination+'/mobile-api-gateway.mjs',mobileSource);
