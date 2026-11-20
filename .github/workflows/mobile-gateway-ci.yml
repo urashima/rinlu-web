@@ -50,6 +50,8 @@ jobs:
           code=(p/'server.mjs').read_bytes()
           assert hashlib.sha256(code).hexdigest()==release['gateway_overlay_sha256']
           assert len(release['source_sha256'])==64
-          assert release['gateway_overlay']=='rinlu-mobile-api-v1-ovh-s3-v1'
+          assert release['gateway_overlay']=='rinlu-mobile-api-v1-ovh-s3-v2'
+          assert release['direct_overlay']=='s3-browser-direct-v1'
+          assert len(release['direct_overlay_sha256'])==64
           print('Gateway overlay + canonical source hash verified')
           PY

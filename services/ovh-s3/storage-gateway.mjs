@@ -5,6 +5,7 @@
  */
 import {createHash} from 'node:crypto';
 import {Readable} from 'node:stream';
+import {createDirectStorage} from './direct-storage.mjs';
 const sha=bytes=>createHash('sha256').update(bytes).digest('hex');
 const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -12,6 +13,7 @@ export function createStorageGateway({s3,backendOrigin,publicOrigin,accountBeare
  if(!s3)return null;
  const uploadEnabled=env.RINLU_S3_UPLOAD_MIRROR==='1';
  const playbackEnabled=env.RINLU_S3_PLAYBACK_CACHE==='1';
+ const direct=createDirectStorage({s3,backendOrigin,publicOrigin,accountBearer,env,transport});
  const active=new Map();
  let uploads=0,cacheJobs=0;
  const upstream=(path,opts)=>transport(new URL(path,backendOrigin),{redirect:'error',signal:AbortSignal.timeout(45000),...opts});
@@ -129,6 +131,7 @@ export function createStorageGateway({s3,backendOrigin,publicOrigin,accountBeare
  return {
   enabled:{upload:uploadEnabled,playback:playbackEnabled},
   async handle(req,res,local,url){
+   if(direct&&await direct.handle(req,res,local,url))return true;
    if(uploadEnabled&&local==='/api/upload'&&req.method==='POST'){await upload(req,res);return true;}
    if(playbackEnabled&&local.startsWith('/api/media/'))return playback(req,res,local,url);
    return false;

@@ -21,6 +21,18 @@ for (const [name, value] of Object.entries(fields)) {
   }
 }
 const {OVH_S3_BUCKET: bucket, OVH_S3_REGION: region, OVH_S3_ENDPOINT: endpoint} = fields;
+const cdnEnabled = process.env.RINLU_CDN_ENABLED === '1';
+const cdn = cdnEnabled ? {
+  RINLU_CDN_BASE_URL: process.env.RINLU_CDN_BASE_URL || '',
+  RINLU_CDN_SIGNING_KEY: process.env.RINLU_CDN_SIGNING_KEY || '',
+  RINLU_CDN_ORIGIN_TOKEN: process.env.RINLU_CDN_ORIGIN_TOKEN || '',
+} : null;
+if(cdn&&(!/^https:\/\/[^/?#]+\/$/.test(cdn.RINLU_CDN_BASE_URL)||!cdn.RINLU_CDN_BASE_URL.includes('.rinlu.com')||
+  cdn.RINLU_CDN_SIGNING_KEY.length<32||cdn.RINLU_CDN_ORIGIN_TOKEN.length<32||Object.values(cdn).some(v=>/[\r\n\0]/.test(v)))) {
+  process.stderr.write('CDN opt-in configuration is incomplete or invalid.\n');
+  process.exit(1);
+}
+
 if (!/^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/.test(bucket) || /\.\.|\.-|-\./.test(bucket)) {
   process.stderr.write('OVH_S3_BUCKET must be a valid lowercase S3 container name.\n');
   process.exit(1);
@@ -47,6 +59,10 @@ process.stdout.write([
   'RINLU_STORAGE_PROVIDER=s3',
   'RINLU_S3_UPLOAD_MIRROR=' + (process.env.OVH_S3_UPLOAD_MIRROR === '0' ? '0' : '1'),
   'RINLU_S3_PLAYBACK_CACHE=' + (process.env.OVH_S3_PLAYBACK_CACHE === '0' ? '0' : '1'),
+  'RINLU_S3_DIRECT_UPLOAD=' + (process.env.OVH_S3_DIRECT_UPLOAD === '0' ? '0' : '1'),
+  'RINLU_S3_DIRECT_PLAYBACK=' + (process.env.OVH_S3_DIRECT_PLAYBACK === '0' ? '0' : '1'),
+  'RINLU_CDN_ENABLED=' + (cdnEnabled ? '1' : '0'),
+  ...(cdnEnabled?Object.entries(cdn).map(([k,v])=>k+'='+v):[]),
   'RINLU_S3_BUCKET=' + bucket,
   'RINLU_S3_REGION=' + region,
   'RINLU_S3_ENDPOINT=' + url.origin,

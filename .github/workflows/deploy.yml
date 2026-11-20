@@ -82,6 +82,9 @@ jobs:
           set -euo pipefail
           node --test services/ovh-s3/tests/*.test.mjs
           node scripts/verify-ovh-s3.mjs
+          python3 -m pip install --quiet boto3
+          python3 scripts/configure-ovh-s3-cors.py
+          node scripts/probe-ovh-s3-browser-direct.mjs
 
       - name: Configure verified SSH identity
         if: steps.platform.outputs.changed == 'true'
@@ -154,6 +157,12 @@ jobs:
           OVH_S3_SECRET_ACCESS_KEY: ${{ secrets.OVH_S3_SECRET_ACCESS_KEY }}
           OVH_S3_UPLOAD_MIRROR: ${{ vars.OVH_S3_UPLOAD_MIRROR }}
           OVH_S3_PLAYBACK_CACHE: ${{ vars.OVH_S3_PLAYBACK_CACHE }}
+          OVH_S3_DIRECT_UPLOAD: ${{ vars.OVH_S3_DIRECT_UPLOAD }}
+          OVH_S3_DIRECT_PLAYBACK: ${{ vars.OVH_S3_DIRECT_PLAYBACK }}
+          RINLU_CDN_ENABLED: ${{ vars.RINLU_CDN_ENABLED }}
+          RINLU_CDN_BASE_URL: ${{ vars.RINLU_CDN_BASE_URL }}
+          RINLU_CDN_SIGNING_KEY: ${{ secrets.RINLU_CDN_SIGNING_KEY }}
+          RINLU_CDN_ORIGIN_TOKEN: ${{ secrets.RINLU_CDN_ORIGIN_TOKEN }}
           HOST: ${{ secrets.OVH_HOST }}
           USER: ${{ secrets.OVH_USER }}
           PORT: ${{ vars.OVH_SSH_PORT || '22' }}

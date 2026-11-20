@@ -5,6 +5,9 @@ on:
     paths:
       - deploy.sh
       - scripts/package-platform.mjs
+      - scripts/apply-platform-direct.mjs
+      - scripts/probe-ovh-s3-browser-direct.mjs
+      - scripts/configure-ovh-s3-cors.py
       - scripts/backfill-ovh-public-media.mjs
       - scripts/tests/backfill-ovh-public-media.test.mjs
       - scripts/verify-ovh-s3.mjs
@@ -36,6 +39,8 @@ jobs:
           node --test scripts/tests/backfill-ovh-public-media.test.mjs
           node --check services/ovh-s3/storage-gateway.mjs
           node --check scripts/package-platform.mjs
+          node --check scripts/apply-platform-direct.mjs
+          node --check scripts/probe-ovh-s3-browser-direct.mjs
       - name: Build canonical platform with OVH S3 bridge
         run: |
           set -euo pipefail
@@ -49,4 +54,9 @@ jobs:
           node --check platform-runtime/server.mjs
           test -f platform-runtime/ovh-s3.mjs
           test -f platform-runtime/storage-gateway.mjs
+          test -f platform-runtime/direct-storage.mjs
+          test -f platform-runtime/signing.mjs
+          test -f platform-runtime/public/source/browser-direct-overlay.mjs
+          node --check platform-runtime/direct-storage.mjs
+          node --check platform-runtime/signing.mjs
 

@@ -1,0 +1,42 @@
+name: Provision private RINLU CDN edge (requires Cloudflare account)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  deploy-edge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      RINLU_CDN_SIGNING_KEY: ${{ secrets.RINLU_CDN_SIGNING_KEY }}
+      RINLU_CDN_ORIGIN_TOKEN: ${{ secrets.RINLU_CDN_ORIGIN_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Validate edge source and configuration
+        run: |
+          set -euo pipefail
+          node --check services/ovh-s3/cdn-worker.mjs
+          node --test services/ovh-s3/tests/cdn-signer.test.mjs
+          test -n "$CLOUDFLARE_API_TOKEN"
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+          test "${#RINLU_CDN_SIGNING_KEY}" -ge 32
+          test "${#RINLU_CDN_ORIGIN_TOKEN}" -ge 32
+      - name: Install official Wrangler
+        run: npm install --global wrangler@4.92.0
+      - name: Deploy Worker for media.rinlu.com
+        run: wrangler deploy --config services/ovh-s3/cdn-wrangler.toml
+      - name: Securely set CDN validation and origin secrets
+        run: |
+          set -euo pipefail
+          printf '%s' "$RINLU_CDN_SIGNING_KEY" | wrangler secret put RINLU_CDN_SIGNING_KEY --config services/ovh-s3/cdn-wrangler.toml
+          printf '%s' "$RINLU_CDN_ORIGIN_TOKEN" | wrangler secret put RINLU_CDN_ORIGIN_TOKEN --config services/ovh-s3/cdn-wrangler.toml
+      - name: Verify edge rejects unsigned playback
+        run: |
+          code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 20 'https://media.rinlu.com/v1/audio/11111111-1111-4111-8111-111111111111/v1-s1024.mp3')
+          test "$code" = 403
+          echo 'Private RINLU media edge deployed and rejects unsigned access.'

@@ -1,0 +1,10 @@
+# Deploy only after the domain is served through the Cloudflare account.
+# Private bucket access is delegated to RINLU's authenticated origin-signer API.
+name = "rinlu-media-edge"
+main = "cdn-worker.mjs"
+compatibility_date = "2026-11-20"
+workers_dev = false
+
+routes = [
+  { pattern = "media.rinlu.com", custom_domain = true }
+]
