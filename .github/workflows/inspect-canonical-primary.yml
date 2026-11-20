@@ -1,6 +1,7 @@
 name: RINLU canonical backend primary source inspection
 on:
-  pull_request:
+  push:
+    branches: [feature/ovh-s3-exclusive-primary]
     paths:
       - 'scripts/inspect-canonical-primary.mjs'
       - '.github/workflows/inspect-canonical-primary.yml'
