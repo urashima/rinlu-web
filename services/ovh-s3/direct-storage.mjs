@@ -2,9 +2,10 @@
  * D1/user rights remain canonical; R2 is retained as a compatibility backup.
  * This is a safe bridge until the canonical Worker supports S3-only finalize.
  */
-import {createHash,randomBytes} from 'node:crypto';
+import {createHash,randomUUID} from 'node:crypto';
 import {createS3Signer,signedTicket,verifyTicket,uploadNonce} from './signing.mjs';
 import {createCdnSigner,assertCdnOriginToken} from './cdn-signer.mjs';
+import {checkPrimaryReady,finalizePrimaryAsset} from './primary-media.mjs';
 const uid=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const sha=b=>createHash('sha256').update(b).digest('hex');
 const maxBytes={audio:25*1024*1024,artwork:5*1024*1024};
@@ -14,6 +15,7 @@ export function createDirectStorage({s3,backendOrigin,publicOrigin,accountBearer
  if(!s3)return null;
  const enabled=env.RINLU_S3_DIRECT_UPLOAD==='1';
  const directPlay=env.RINLU_S3_DIRECT_PLAYBACK==='1';
+ const primaryOnly=env.RINLU_S3_PRIMARY_ONLY==='1';
  const edgeEnabled=env.RINLU_CDN_ENABLED==='1';
  if(!enabled&&!directPlay)return null;
  const signer=createS3Signer(env);
@@ -54,10 +56,16 @@ export function createDirectStorage({s3,backendOrigin,publicOrigin,accountBearer
   const remaining=recent.filter(t=>t>now-60000);
   if(remaining.length>=8)return send(res,429,{error:'Too many upload requests'});
   remaining.push(now);sessions.set(owner.id,remaining);
+  if(primaryOnly){
+   try{await checkPrimaryReady({backendOrigin,headers:headers(req),transport,expectedBucket:s3.bucket});}
+   catch{return send(res,503,{error:'The S3-only database and scanner are not yet ready'});}
+  }
   const expires=now+300000;
-  const key='staging/'+owner.id+'/'+uploadNonce()+extension[kind];
+  const nonce=uploadNonce();
+  const key='staging/'+owner.id+'/'+nonce+extension[kind];
+  const assetId=primaryOnly?randomUUID():null;
   const grant=signer.postPolicy(key,mimeType[kind],size,300);
-  const ticket=signedTicket(keySecret,{key,owner:owner.id,size,kind,name,expires,session:sessionDigest(req)});
+  const ticket=signedTicket(keySecret,{key,owner:owner.id,size,kind,name,expires,session:sessionDigest(req),nonce,assetId,mode:primaryOnly?'s3-primary':'r2-compat'});
   return send(res,200,{upload:{...grant,kind,size},ticket,expiresAt:expires});
  }
  async function complete(req,res){
@@ -68,12 +76,21 @@ export function createDirectStorage({s3,backendOrigin,publicOrigin,accountBearer
   const data=await readBody(req,5000);
   let t;
   try{t=verifyTicket(keySecret,data.ticket);}catch{return send(res,403,{error:'Invalid or expired upload ticket'});}
-  if(t.owner!==owner.id||t.session!==sessionDigest(req)||t.kind!==data.kind||!t.key?.startsWith('staging/'+owner.id+'/'))return send(res,403,{error:'Upload ticket does not match this account'});
+  if(t.owner!==owner.id||t.session!==sessionDigest(req)||t.kind!==data.kind||!t.key?.startsWith('staging/'+owner.id+'/')||t.mode!==(primaryOnly?'s3-primary':'r2-compat'))return send(res,403,{error:'Upload ticket does not match this storage mode or account'});
   if(!Number.isSafeInteger(t.size)||t.size<100||t.size>maxBytes[t.kind])return send(res,403,{error:'Invalid file size'});
   const signature=sha(data.ticket);
   if(processing.has(signature))return send(res,409,{error:'This file is already being finalized'});
   processing.add(signature);
   try{
+   if(primaryOnly){
+    try{
+     const registered=await finalizePrimaryAsset({s3,ticket:t,backendOrigin,headers:headers(req),transport});
+     res.setHeader('X-Rinlu-Storage','ovh-s3-primary');
+     return send(res,201,registered);
+    }catch(error){
+     return send(res,503,{error:'S3 original is preserved, but canonical database/scan registration is not confirmed. Retry finalizing this upload.'});
+    }
+   }
    const meta=await s3.head(t.key);
    if(!meta||meta.size!==t.size)return send(res,409,{error:'The direct upload was not received or its size differs'});
    const response=await s3.get(t.key);
