@@ -78,13 +78,9 @@ if (indexHtml.includes('privacy-footer.js')) throw new Error('Duplicate privacy 
 await cp('scripts/privacy-footer.js', runtime + '/public/privacy-footer.js');
 await writeFile(indexPath, indexHtml.replace('</body>', '<script defer src="/music/privacy-footer.js"></script>\n</body>'));
 
-// Static, versioned social preview; no client-side JavaScript is needed by crawlers.
-// The original JPEG is stored as six text-safe base64 segments in this repository,
-// decoded and checksum-verified here to make publishing deterministic.
-const previewParts=[];
-for(let i=1;i<=6;i++)previewParts.push((await readFile('scripts/social-preview/part'+i+'.txt','utf8')).trim());
-const previewBinary=Buffer.from(previewParts.join(''),'base64');
-const expectedPreviewSha='7e70e193abb5732dafe68fc889b9ea9b0d823fb2fc97c8c7a72ed3015275b464';
+// Static, versioned social preview. Uses the supplied original JPEG, unchanged.
+const previewBinary=await readFile('site/assets/rinlu-share-neon.jpg');
+const expectedPreviewSha='e87e32b2f126125381a707479813a3a36bb6af5279b1048c941cd3a8e1f553d2';
 if(createHash('sha256').update(previewBinary).digest('hex')!==expectedPreviewSha)
  throw Error('RINLU social preview image checksum mismatch');
 await mkdir(runtime+'/public/share',{recursive:true});
@@ -101,8 +97,8 @@ const socialTags=[
  '<meta property="og:image" content="https://rinlu.com/music/share/rinlu-neon.jpg">',
  '<meta property="og:image:secure_url" content="https://rinlu.com/music/share/rinlu-neon.jpg">',
  '<meta property="og:image:type" content="image/jpeg">',
- '<meta property="og:image:width" content="480">',
- '<meta property="og:image:height" content="480">',
+ '<meta property="og:image:width" content="1254">',
+ '<meta property="og:image:height" content="1254">',
  '<meta property="og:image:alt" content="RINLU — music, play and create">',
  '<meta name="twitter:card" content="summary_large_image">',
  '<meta name="twitter:image" content="https://rinlu.com/music/share/rinlu-neon.jpg">'
