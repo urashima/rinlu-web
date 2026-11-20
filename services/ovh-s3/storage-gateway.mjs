@@ -9,6 +9,9 @@ import {createDirectStorage} from './direct-storage.mjs';
 const sha=bytes=>createHash('sha256').update(bytes).digest('hex');
 const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+// Hosted accounts can have opaque IDs. Preserve the canonical owner/asset key.
+const ownerSegment=/^[A-Za-z0-9_-]{1,128}$/;
+
 export function createStorageGateway({s3,backendOrigin,publicOrigin,accountBearer,env=process.env,transport=fetch}){
  if(!s3)return null;
  const uploadEnabled=env.RINLU_S3_UPLOAD_MIRROR==='1';
@@ -32,11 +35,14 @@ export function createStorageGateway({s3,backendOrigin,publicOrigin,accountBeare
   if(!/^multipart\/form-data; boundary=/.test(String(req.headers['content-type']||'')))return send(res,415,{error:'Expected multipart upload'});
   if(Number(req.headers['content-length']||0)>27*1024*1024)return send(res,413,{error:'Upload too large'});
   uploads++;
+  let stage='receive_body';
+  let originalAccepted=false;
   try{
    let total=0;const parts=[];
    for await(const chunk of req){total+=chunk.length;if(total>27*1024*1024)return send(res,413,{error:'Upload too large'});parts.push(chunk)}
    const body=Buffer.concat(parts);
    const headers=authHeaders(req);headers.set('origin',publicOrigin);headers.set('content-type',req.headers['content-type']);
+   stage='original_upload';
    const upstreamResponse=await upstream('/api/upload',{method:'POST',headers,body});
    const raw=await upstreamResponse.text();
    let result;try{result=JSON.parse(raw)}catch{}
@@ -44,24 +50,30 @@ export function createStorageGateway({s3,backendOrigin,publicOrigin,accountBeare
     res.writeHead(upstreamResponse.status,{'Content-Type':upstreamResponse.headers.get('content-type')||'application/json','Cache-Control':'no-store'});
     res.end(raw);return;
    }
+   originalAccepted=true;
+   stage='check_original_response';
    if(!result||!uuid.test(result.id||'')||!/^[a-f0-9]{64}$/.test(result.hash||''))throw Error('Unexpected canonical upload response');
+   stage='verify_file';
    const form=await new Request(publicOrigin+'/music/api/upload',{method:'POST',headers:{'content-type':req.headers['content-type']},body}).formData();
    const file=form.get('file'),kind=form.get('kind');
    if(!file||typeof file.arrayBuffer!=='function'||!['audio','artwork'].includes(String(kind)))throw Error('Unexpected multipart data');
    const bytes=Buffer.from(await file.arrayBuffer());
    if(sha(bytes)!==result.hash||bytes.length!==Number(result.size))throw Error('Canonical upload checksum differs');
+   stage='verify_owner';
    const me=await upstream('/api/me',{headers:authHeaders(req)});
    if(!me.ok)throw Error('Cannot validate uploading account');
    const user=(await me.json()).user;
-   if(!uuid.test(user?.id||''))throw Error('Invalid authenticated owner');
+   if(typeof user?.id!=='string'||!ownerSegment.test(user.id))throw Error('Invalid authenticated owner');
    const key=user.id+'/'+result.id;
    const mediaType=String(kind)==='audio'?'audio/mpeg':'image/jpeg';
+   stage='verify_s3_copy';
    await s3.verifiedPut(key,bytes,mediaType);
    res.setHeader('X-Rinlu-Storage','ovh-s3-mirrored');
    res.writeHead(upstreamResponse.status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'});
    res.end(raw);
   }catch(error){
-   console.error('RINLU S3 upload mirror failure:',error?.name||'Error');
+   console.error('RINLU S3 upload mirror failure:',stage,error?.name||'Error');
+   if(!originalAccepted)return send(res,502,{error:'Could not confirm the original upload. Please retry the same file.'});
    return send(res,502,{error:'Upload reached the original storage, but OVH replication was not verified. Please retry the same file.'});
   }finally{uploads--;}
  }

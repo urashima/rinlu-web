@@ -20,7 +20,8 @@ function outgoing(){
  return res;
 }
 const collect=async res=>{let output='';for await(const chunk of res)output+=chunk.toString();return output;};
-test('upload mirrors verified source bytes to owner/asset S3 key',async()=>{
+for(const owner of [OWNER,'user-Hosted_Account123']){
+ test('upload mirrors verified source bytes for owner '+owner,async()=>{
  const bytes=Buffer.from('TEST_AUDIO_BYTES');
  const form=new FormData();
  form.set('kind','audio');form.set('file',new File([bytes],'test.mp3',{type:'audio/mpeg'}));
@@ -34,7 +35,7 @@ test('upload mirrors verified source bytes to owner/asset S3 key',async()=>{
    assert.equal(opts.headers.get('authorization'),'Bearer TEST');
    return Response.json({id:ASSET,hash:createHash('sha256').update(bytes).digest('hex'),size:bytes.length,mime:'audio/mpeg'},{status:201});
   }
-  if(pathname==='/api/me')return Response.json({user:{id:OWNER}});
+  if(pathname==='/api/me')return Response.json({user:{id:owner}});
   throw Error('Unexpected upstream path '+pathname);
  };
  const bridge=createStorageGateway({s3,backendOrigin:'https://original.example',publicOrigin:'https://rinlu.com',accountBearer:()=> 'Bearer TEST',env:{RINLU_S3_UPLOAD_MIRROR:'1'},transport});
@@ -42,9 +43,10 @@ test('upload mirrors verified source bytes to owner/asset S3 key',async()=>{
  const handled=await bridge.handle(req,res,'/api/upload',new URL('https://rinlu.com/music/api/upload'));
  assert.equal(handled,true);assert.equal(res.statusCode,201);
  assert.equal(JSON.parse(await collect(res)).id,ASSET);
- assert.deepEqual(uploads,[{key:OWNER+'/'+ASSET,bytes,mime:'audio/mpeg'}]);
+ assert.deepEqual(uploads,[{key:owner+'/'+ASSET,bytes,mime:'audio/mpeg'}]);
  assert.equal(res.headers['x-rinlu-storage'],'ovh-s3-mirrored');
 });
+}
 test('disabled flags leave canonical API proxy unchanged',async()=>{
  const bridge=createStorageGateway({s3:{},backendOrigin:'https://original.example',publicOrigin:'https://rinlu.com',accountBearer:()=>'',env:{}});
  const req=incoming(null,'GET'),res=outgoing();
