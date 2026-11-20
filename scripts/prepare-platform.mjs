@@ -2,6 +2,7 @@
 import {createHash} from 'node:crypto';
 import {mkdir,writeFile,readFile,rm,cp} from 'node:fs/promises';
 import {execFileSync} from 'node:child_process';
+import {applyPlatformBrand} from './apply-platform-brand.mjs';
 const origin='https://sonora-independent-music.kai-ma.chatgpt.site';
 const manifest=await fetch(origin+'/source/manifest.json?release='+Date.now()).then(r=>{if(!r.ok)throw Error('Release manifest unavailable');return r.json()});
 if(!/^[a-f0-9]{64}$/.test(manifest.sha256)||manifest.url!=='/source/rinlu-player-source.tar.gz')throw Error('Invalid release manifest');
@@ -17,6 +18,8 @@ with tarfile.open('.platform-source/release.tar.gz') as t:
  t.extractall('.platform-source',filter='data')`]);
 const source='.platform-source/rinlu-player-source',index=JSON.parse(await readFile(source+'/SOURCE-MANIFEST.json','utf8'));
 for(const [path,sha]of Object.entries(index.files)){if(path.startsWith('/')||path.split('/').includes('..'))throw Error('Unsafe manifest path');if(createHash('sha256').update(await readFile(source+'/'+path)).digest('hex')!==sha)throw Error('Source file checksum mismatch: '+path)}
+// Apply the audited, separately published wordmark overlay after verifying the pristine archive.
+await applyPlatformBrand(source);
 await writeFile('.platform-source/release.json',JSON.stringify({release:manifest.release,source_sha256:manifest.sha256,published_at:new Date().toISOString(),backend:origin})+'\n');
 if(process.env.GITHUB_OUTPUT)await writeFile(process.env.GITHUB_OUTPUT,'changed=true\n',{flag:'a'});
 console.log('Verified canonical platform source',manifest.sha256,'files',Object.keys(index.files).length);
