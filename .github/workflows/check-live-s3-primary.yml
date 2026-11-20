@@ -17,6 +17,8 @@ jobs:
         with:
           node-version: '24'
       - name: Read-only probe (report nonready without mutating production)
+        env:
+          RINLU_SITES_ACCESS_TOKEN: ${{ secrets.RINLU_SITES_ACCESS_TOKEN }}
         run: |
           if node scripts/verify-canonical-s3-primary.mjs; then
             echo 'Live canonical S3-only capability is READY.'
