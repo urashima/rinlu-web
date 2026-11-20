@@ -81,7 +81,7 @@ export async function audioUploadPolicyAdmin(req:Request,account:Row){
   try{record=JSON.parse(previous.value)}catch{fail(503,'Stored audio upload policy is malformed.');}
   const parsed=envelope.safeParse(record);
   if(!parsed.success)fail(503,'Stored audio upload policy is invalid.');
-  rev=parsed.data.revision;
+  rev=parsed.data!.revision;
  }
  if(rev!==body.expected_revision)fail(409,'Audio upload policy was updated by another administrator. Reload to continue.');
  const next={
