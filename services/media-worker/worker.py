@@ -7,6 +7,7 @@ from urllib.parse import urlparse
 from media_validation import audio_stream
 from audio_analysis import analyze_pcm
 from mail_delivery import send_notification, permanent_failure
+from s3_io import Storage, validate_key
 
 def setting(key, default=''):
     return os.environ.get('RINLU_'+key, os.environ.get('SONORA_'+key, default))
@@ -62,31 +63,58 @@ def heartbeat():
         raise RuntimeError('Scanner signatures absent or stale')
     with tempfile.NamedTemporaryFile() as probe:
         probe.write(b'RINLU scanner readiness probe'); probe.flush(); scan(probe.name)
-    post('/api/service/heartbeat', {'worker': WORKER, 'scanner': 'ready', 'version': '2'})
+    ready={'worker': WORKER, 'scanner': 'ready', 'version': '3'}
+    if setting('S3_PROCESSOR_MODE')=='1':
+        Storage()  # Fail closed if private S3 credentials or endpoint are missing.
+        ready['s3_primary']='ready'
+    post('/api/service/heartbeat', ready)
 
 def process(job):
     lease=job['lease']
     try:
         with tempfile.TemporaryDirectory(prefix='sonora-') as directory:
             source=Path(directory)/'source.bin'; output=Path(directory)/'stream.mp3'
-            size=0
-            with request(job['input'], lease=lease) as response, source.open('wb') as target:
-                while True:
-                    chunk=response.read(65536)
-                    if not chunk: break
-                    size+=len(chunk)
-                    if size>25*1024*1024: raise RuntimeError('Original exceeds input limit')
-                    target.write(chunk)
+            is_s3=job.get('storage_provider')=='ovh-s3'
+            storage=None
+            if is_s3:
+                if setting('S3_PROCESSOR_MODE')!='1':raise RuntimeError('S3-only scanning has not been enabled')
+                storage=Storage()
+                source_meta=storage.read(validate_key(job['input_storage_key'],'original'),source)
+                if job.get('original_sha256') and job['original_sha256']!=source_meta['sha256']:
+                    raise RuntimeError('S3 original hash mismatch')
+            else:
+                size=0
+                with request(job['input'], lease=lease) as response, source.open('wb') as target:
+                    while True:
+                        chunk=response.read(65536)
+                        if not chunk: break
+                        size+=len(chunk)
+                        if size>25*1024*1024: raise RuntimeError('Original exceeds input limit')
+                        target.write(chunk)
             scan(source)
             metadata=json.loads(command(['ffprobe','-v','error','-protocol_whitelist','file,pipe','-show_entries','stream=codec_type,sample_rate,channels:stream_disposition=attached_pic:format=duration','-of','json',str(source)]))
             audio_stream(metadata)
             command(['ffmpeg','-nostdin','-v','error','-protocol_whitelist','file,pipe','-i',str(source),'-map','0:a:0','-vn','-map_metadata','-1','-af','loudnorm=I=-16:TP=-1.5:LRA=11','-codec:a','libmp3lame','-b:a','128k','-ar','44100','-ac','2','-id3v2_version','3','-f','mp3',str(output)],timeout=240)
             if output.stat().st_size>32*1024*1024: raise RuntimeError('Rendition exceeds 32 MB; use a shorter recording')
             scan(output)
-            boundary='sonora-'+uuid.uuid4().hex
-            body=(f'--{boundary}\r\nContent-Disposition: form-data; name="scan"\r\n\r\nclean\r\n--{boundary}\r\nContent-Disposition: form-data; name="file"; filename="stream.mp3"\r\nContent-Type: audio/mpeg\r\n\r\n').encode()+output.read_bytes()+f'\r\n--{boundary}--\r\n'.encode()
-            with request(job['complete'],body,lease,'multipart/form-data; boundary='+boundary) as response:
-                json.load(response)
+            if is_s3:
+                # Upload a scanned rendition directly to private OVH S3, never R2.
+                result=storage.put_rendition(validate_key(job['output_storage_key'],'rendition'),output)
+                post(job['complete'],{
+                    'storage_provider':'ovh-s3',
+                    'input_storage_key':job['input_storage_key'],
+                    'output_storage_key':result['storage_key'],
+                    'original_sha256':source_meta['sha256'],
+                    'rendition_sha256':result['sha256'],
+                    'rendition_size':result['size'],
+                    'scan':'clean',
+                    'processor_version':'s3-primary-v1',
+                },lease)
+            else:
+                boundary='sonora-'+uuid.uuid4().hex
+                body=(f'--{boundary}\r\nContent-Disposition: form-data; name="scan"\r\n\r\nclean\r\n--{boundary}\r\nContent-Disposition: form-data; name="file"; filename="stream.mp3"\r\nContent-Type: audio/mpeg\r\n\r\n').encode()+output.read_bytes()+f'\r\n--{boundary}--\r\n'.encode()
+                with request(job['complete'],body,lease,'multipart/form-data; boundary='+boundary) as response:
+                    json.load(response)
             print(json.dumps({'job':job['id'],'status':'complete'}),flush=True)
     except Exception as error:
         infected=str(error)=='infected'
