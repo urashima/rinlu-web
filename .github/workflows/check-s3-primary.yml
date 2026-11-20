@@ -32,3 +32,5 @@ jobs:
         run: |
           node --test scripts/tests/render-ovh-s3-env.test.mjs
           bash -n deploy.sh
+      - name: Read-only probe of canonical D1 S3-only capability
+        run: node scripts/verify-canonical-s3-primary.mjs
