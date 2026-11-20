@@ -22,7 +22,7 @@ const response=await fetch(base+'/catalog',{signal:AbortSignal.timeout(20000)});
 if(!response.ok)throw Error('Canonical catalog unavailable, HTTP '+response.status);
 const tracks=(await response.json()).tracks;
 if(!Array.isArray(tracks))throw Error('Canonical catalog does not include tracks');
-const ids=new Set(),errors=[];
+const ids=new Set(),errors=[],unavailableStatus={};
 let copied=0,skipped=0,unavailable=0,attempted=0;
 for(const track of tracks){
  if(attempted>=max)break;
@@ -31,7 +31,7 @@ for(const track of tracks){
  try{
   let authorization;
   for(let retry=0;retry<3;retry++){
-   authorization=await fetch(base+'/authorize',{
+   authorization=await fetch(base+'/playback/authorize',{
     method:'POST',headers:{'content-type':'application/json','origin':origin},
     body:JSON.stringify({track_id:track.id}),signal:AbortSignal.timeout(20000)});
    if(authorization.status!==429)break;
@@ -39,14 +39,14 @@ for(const track of tracks){
   }
   if(!authorization.ok){
    await authorization.body?.cancel();
-   if([401,403,404,409,429,503].includes(authorization.status)){unavailable++;continue;}
+   if([401,403,404,409,429,503].includes(authorization.status)){unavailable++;unavailableStatus[authorization.status]=(unavailableStatus[authorization.status]||0)+1;continue;}
    throw Error('Authorization returned HTTP '+authorization.status);
   }
   const info=await authorization.json();
   const mediaUrl=new URL(info.url||'',origin);
   if(mediaUrl.origin!==origin||mediaUrl.pathname!=='/music/api/media/'+track.id||!mediaUrl.searchParams.has('token'))throw Error('Unsafe authorized playback path');
   const metadata=await fetch(mediaUrl,{method:'HEAD',signal:AbortSignal.timeout(20000)});
-  if(!metadata.ok){await metadata.body?.cancel();unavailable++;continue;}
+  if(!metadata.ok){unavailableStatus['head_'+metadata.status]=(unavailableStatus['head_'+metadata.status]||0)+1;await metadata.body?.cancel();unavailable++;continue;}
   const size=Number(metadata.headers.get('content-length'));
   if(!Number.isSafeInteger(size)||size<1||size>32*1024*1024)throw Error('Playback size outside permitted limits');
   const key='playback/'+track.id+'/v'+track.version+'-s'+size+'.mp3';
@@ -65,5 +65,5 @@ for(const track of tracks){
  }
  await sleep(350);
 }
-console.log(JSON.stringify({catalog_tracks:tracks.length,attempted,copied,existing:skipped,unavailable,failed:errors.length}));
-if(errors.length)process.exitCode=1;
+console.log(JSON.stringify({catalog_tracks:tracks.length,attempted,copied,existing:skipped,unavailable,unavailable_status:unavailableStatus,failed:errors.length}));
+if(errors.length||(attempted>0&&copied+skipped===0))process.exitCode=1;
