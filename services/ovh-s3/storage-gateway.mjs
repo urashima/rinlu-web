@@ -26,7 +26,7 @@ export function createStorageGateway({s3,backendOrigin,publicOrigin,accountBeare
  };
  async function upload(req,res){
   if(req.headers.origin!==publicOrigin)return send(res,403,{error:'Invalid upload origin'});
-  if(uploads>=2)return send(res,429,{error:'Two uploads are already in progress. Retry shortly.'});
+  if(uploads>=1)return send(res,429,{error:'An upload is already in progress. Retry shortly.'});
   if(!/^multipart\/form-data; boundary=/.test(String(req.headers['content-type']||'')))return send(res,415,{error:'Expected multipart upload'});
   if(Number(req.headers['content-length']||0)>27*1024*1024)return send(res,413,{error:'Upload too large'});
   uploads++;
@@ -71,7 +71,7 @@ export function createStorageGateway({s3,backendOrigin,publicOrigin,accountBeare
   return Number.isSafeInteger(value)&&value>=1?value:null;
  };
  function cacheAsync(key,mediaPath,headers,expected){
-  if(active.has(key)||cacheJobs>=1)return;
+  if(active.has(key)||cacheJobs>=1||uploads>0)return;
   cacheJobs++;
   const task=(async()=>{
    const response=await upstream(mediaPath,{method:'GET',headers});
