@@ -35,4 +35,13 @@ jobs:
               print(f'{j+1:5}: {lines[j][:340]}')
               shown.add(j)
            print('END FILE')
+          p=Path('.platform-source/rinlu-player-source/app/rinlu.tsx')
+          lines=p.read_text(encoding='utf-8').splitlines()
+          print('BEGIN ADMIN-COMPONENT')
+          for no in range(458,466): print(str(no+1)+': '+lines[no][:22000])
+          print('END ADMIN-COMPONENT')
+          p=Path('.platform-source/rinlu-player-source/app/site-font-admin.tsx')
+          print('BEGIN SITE-FONTS-COMPONENT')
+          for no,line in enumerate(p.read_text(encoding='utf-8').splitlines(),1): print(str(no)+': '+line[:2000])
+          print('END SITE-FONTS-COMPONENT')
           PY
