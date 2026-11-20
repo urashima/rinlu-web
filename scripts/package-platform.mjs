@@ -24,6 +24,9 @@ const siteOverlaySource=await readFile('scripts/apply-platform-site.mjs','utf8')
 const siteSettingsComponent=await readFile('scripts/site-console/site-share-admin.tsx','utf8');
 const siteOverlayHash=createHash('sha256').update(siteOverlaySource).digest('hex');
 const directOverlaySource=await readFile('scripts/apply-platform-direct.mjs','utf8');
+const mp3OverlaySource=await readFile('scripts/apply-platform-mp3-upload.mjs','utf8');
+const mp3PolicySource=await readFile('services/mp3-policy/mp3-upload-policy.ts','utf8');
+const mp3OverlayHash=createHash('sha256').update(mp3OverlaySource+mp3PolicySource).digest('hex');
 const directOverlayHash=createHash('sha256').update(directOverlaySource).digest('hex');
 const brandOverlayHash=createHash('sha256').update(brandSource).digest('hex');
 const mobileSource=await readFile('services/mobile-gateway/mobile-api.mjs','utf8');
@@ -75,6 +78,8 @@ const enrichedRelease={...release,gateway_overlay_sha256:gatewayOverlayHash,
   gateway_overlay:'rinlu-mobile-api-v1-ovh-s3-v2',
   direct_overlay_sha256:directOverlayHash,
   direct_overlay:'s3-browser-direct-v1',
+  mp3_upload_policy:'mp3-average-192kbps-cbr-vbr',
+  mp3_upload_overlay_sha256:mp3OverlayHash,
   brand_overlay_sha256:brandOverlayHash,
   brand_overlay:'madimi-one-wordmark-v1',
   site_overlay_sha256:siteOverlayHash,
@@ -111,6 +116,9 @@ await writeFile(destination+'/signing.mjs',signingSource);
 await writeFile(destination+'/cdn-signer.mjs',cdnSignerSource);
 await writeFile(destination+'/cdn-worker.mjs',cdnWorkerSource);
 await writeFile(destination+'/browser-direct-overlay.mjs',directOverlaySource);
+await writeFile(destination+'/mp3-upload-overlay.mjs',mp3OverlaySource);
+await writeFile(destination+'/mp3-upload-policy.ts',mp3PolicySource);
+await writeFile(destination+'/mp3-upload-policy.sha256',mp3OverlayHash+'  mp3-upload-policy-overlay\n');
 await writeFile(destination+'/browser-direct-overlay.sha256',directOverlayHash+'  browser-direct-overlay.mjs\n');
 await writeFile(destination+'/ovh-s3.sha256',createHash('sha256').update(s3Source).digest('hex')+'  ovh-s3.mjs\n');
 await writeFile(destination+'/storage-gateway.sha256',createHash('sha256').update(bridgeSource).digest('hex')+'  storage-gateway.mjs\n');
