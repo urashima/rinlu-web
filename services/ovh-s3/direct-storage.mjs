@@ -4,6 +4,7 @@
  */
 import {createHash,randomBytes} from 'node:crypto';
 import {createS3Signer,signedTicket,verifyTicket,uploadNonce} from './signing.mjs';
+import {createCdnSigner,assertCdnOriginToken} from './cdn-signer.mjs';
 const uid=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const sha=b=>createHash('sha256').update(b).digest('hex');
 const maxBytes={audio:25*1024*1024,artwork:5*1024*1024};
@@ -13,8 +14,10 @@ export function createDirectStorage({s3,backendOrigin,publicOrigin,accountBearer
  if(!s3)return null;
  const enabled=env.RINLU_S3_DIRECT_UPLOAD==='1';
  const directPlay=env.RINLU_S3_DIRECT_PLAYBACK==='1';
+ const edgeEnabled=env.RINLU_CDN_ENABLED==='1';
  if(!enabled&&!directPlay)return null;
  const signer=createS3Signer(env);
+ const signEdge=edgeEnabled?createCdnSigner(env):null;
  const keySecret=env.RINLU_S3_SECRET_ACCESS_KEY;
  const processing=new Set();
  const sessions=new Map();
@@ -117,12 +120,26 @@ export function createDirectStorage({s3,backendOrigin,publicOrigin,accountBearer
   let meta;
   try{meta=await s3.head(key);}catch{return send(res,200,{...payload,url:'/music'+payload.url});}
   if(meta?.size!==total)return send(res,200,{...payload,url:'/music'+payload.url});
-  const signed=signer.signedGet(key,900);
-  return send(res,200,{...payload,probe_url:'/music'+payload.url,source_url:payload.url,url:signed,delivery:'ovh-s3-direct',expires_at:Date.now()+900000});
+  const signed=signEdge?signEdge(data.track_id,record.version,total):signer.signedGet(key,900);
+  return send(res,200,{...payload,probe_url:'/music'+payload.url,url:signed,delivery:signEdge?'rinlu-cdn-edge':'ovh-s3-direct',expires_at:Date.now()+900000});
+ }
+ async function cdnOrigin(req,res,url){
+  if(!edgeEnabled)return send(res,404,{error:'Not found'});
+  const key=url.searchParams.get('key')||'';
+  const expected=env.RINLU_CDN_ORIGIN_TOKEN;
+  const supplied=String(req.headers.authorization||'').replace(/^Bearer /,'');
+  try{assertCdnOriginToken(expected,supplied);}catch{return send(res,403,{error:'CDN service authentication failed'});}
+  const re=/^playback\/([0-9a-f-]{36})\/v([1-9][0-9]*)-s([1-9][0-9]*)\.mp3$/i;
+  const m=re.exec(key);
+  if(!m||!uid.test(m[1])||Number(m[3])>32*1024*1024)return send(res,400,{error:'Invalid media key'});
+  const info=await s3.head(key);
+  if(info?.size!==Number(m[3]))return send(res,404,{error:'S3 media unavailable'});
+  return send(res,200,{url:signer.signedGet(key,60)});
  }
  return {
   enabled:{upload:enabled,playback:directPlay},
-  async handle(req,res,local){
+  async handle(req,res,local,url){
+   if(local==='/api/storage/cdn-origin'&&req.method==='GET'){await cdnOrigin(req,res,url);return true;}
    if(local==='/api/storage/direct/init'&&req.method==='POST'){await issue(req,res);return true;}
    if(local==='/api/storage/direct/complete'&&req.method==='POST'){await complete(req,res);return true;}
    if(local==='/api/playback/authorize'&&req.method==='POST'&&directPlay){await authorize(req,res);return true;}
