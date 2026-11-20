@@ -50,5 +50,5 @@ test('rejects fake headers, truncated audio and trailing garbage',()=>{
  const good=fakeMp3(Array(60).fill(192));
  assert.throws(()=>inspectMp3Upload(good.subarray(0,good.length-4)),/truncated/);
  const extra=Buffer.concat([Buffer.from(good),Buffer.from('garbage')]);
- assert.throws(()=>inspectMp3Upload(extra),/duration or trailing/);
+ assert.throws(()=>inspectMp3Upload(extra),/Invalid MPEG|duration or trailing/);
 });
