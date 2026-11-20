@@ -116,6 +116,12 @@ jobs:
         env:
           PROCESSOR: ${{ secrets.RINLU_PROCESSOR_TOKEN }}
           SITE_ACCESS: ${{ secrets.RINLU_SITES_ACCESS_TOKEN }}
+          S3_PROCESSOR_MODE: ${{ vars.RINLU_S3_PROCESSOR_MODE }}
+          OVH_S3_BUCKET: ${{ vars.OVH_S3_BUCKET }}
+          OVH_S3_REGION: ${{ vars.OVH_S3_REGION }}
+          OVH_S3_ENDPOINT: ${{ vars.OVH_S3_ENDPOINT }}
+          OVH_S3_ACCESS_KEY_ID: ${{ secrets.OVH_S3_ACCESS_KEY_ID }}
+          OVH_S3_SECRET_ACCESS_KEY: ${{ secrets.OVH_S3_SECRET_ACCESS_KEY }}
           HOST: ${{ secrets.OVH_HOST }}
           USER: ${{ secrets.OVH_USER }}
           PORT: ${{ vars.OVH_SSH_PORT || '22' }}
@@ -128,6 +134,15 @@ jobs:
           python3 - <<'PY'
           import os,pathlib
           values={'RINLU_ORIGIN':'https://sonora-independent-music.kai-ma.chatgpt.site','RINLU_PROCESSOR_TOKEN':os.environ['PROCESSOR'],'RINLU_SITES_ACCESS_TOKEN':os.environ['SITE_ACCESS']}
+          if os.environ.get('S3_PROCESSOR_MODE')=='1':
+              mappings={'RINLU_S3_BUCKET':'OVH_S3_BUCKET','RINLU_S3_REGION':'OVH_S3_REGION',
+                        'RINLU_S3_ENDPOINT':'OVH_S3_ENDPOINT','RINLU_S3_ACCESS_KEY_ID':'OVH_S3_ACCESS_KEY_ID',
+                        'RINLU_S3_SECRET_ACCESS_KEY':'OVH_S3_SECRET_ACCESS_KEY'}
+              assert all(os.environ.get(k) for k in mappings.values()), 'S3 processor credential configuration incomplete'
+              values.update({k:os.environ[v] for k,v in mappings.items()})
+              values['RINLU_S3_PROCESSOR_MODE']='1'
+          else:
+              values['RINLU_S3_PROCESSOR_MODE']='0'
           assert all(not any(c in v for c in '\r\n\0') for v in values.values())
           p=pathlib.Path('/tmp/rinlu-worker.env');p.touch(mode=0o600);p.write_text(''.join(k+'='+v+'\n' for k,v in values.items()))
           PY
