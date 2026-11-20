@@ -7,12 +7,13 @@ from urllib.parse import quote
 
 UUID=r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'
 ORIGINAL=re.compile(r'^originals/'+UUID+r'/'+UUID+r'$',re.I)
-RENDITION=re.compile(r'^renditions/'+UUID+r'/v[1-9][0-9]*\.mp3$',re.I)
+RENDITION=re.compile(r'^renditions/'+UUID+r'/v[1-9][0-9]*\.mp3
 MAX_SOURCE=25*1024*1024
 MAX_RENDITION=32*1024*1024
 
 def validate_key(key,kind='original'):
-    if not isinstance(key,str) or len(key)>250 or not ((ORIGINAL if kind=='original' else RENDITION).fullmatch(key)):
+    rules={'original':ORIGINAL,'rendition':RENDITION,'artwork':ARTWORK}
+    if kind not in rules or not isinstance(key,str) or len(key)>250 or not rules[kind].fullmatch(key):
         raise ValueError('Untrusted S3 object locator')
     return key
 
@@ -44,7 +45,7 @@ class Storage:
         self.clock=clock or (lambda:datetime.datetime.now(datetime.timezone.utc))
 
     def _signed(self,method,key,body=None,content_type=None):
-        kind='rendition' if method=='PUT' or RENDITION.fullmatch(key or '') else 'original'
+        kind='artwork' if ARTWORK.fullmatch(key or '') else 'rendition' if RENDITION.fullmatch(key or '') else 'original'
         validate_key(key,kind)
         path='/'+quote(self.bucket,safe='')+'/'+('/'.join(quote(c,safe='') for c in key.split('/')))
         stamp=self.clock().strftime('%Y%m%dT%H%M%SZ')
@@ -82,13 +83,19 @@ class Storage:
         if total<100:raise RuntimeError('S3 original too small')
         return {'size':total,'sha256':sha.hexdigest()}
 
-    def put_rendition(self,key,source):
-        validate_key(key,'rendition')
+    def _put_media(self,key,source,mime,kind,max_bytes):
+        validate_key(key,kind)
         with open(source,'rb') as stream:
-            body=stream.read(MAX_RENDITION+1)
-        if not 0<len(body)<=MAX_RENDITION:raise RuntimeError('S3 rendition outside size bounds')
-        req=self._signed('PUT',key,body,'audio/mpeg')
+            body=stream.read(max_bytes+1)
+        if not 0<len(body)<=max_bytes:raise RuntimeError('S3 processed media outside size bounds')
+        req=self._signed('PUT',key,body,mime)
         with self.opener.open(req,timeout=240) as response:
-            if response.status not in (200,201):raise RuntimeError('S3 rendition upload failed')
+            if response.status not in (200,201):raise RuntimeError('Private S3 processed media upload failed')
             response.read(2048)
         return {'storage_key':key,'size':len(body),'sha256':digest(body),'storage_provider':'ovh-s3'}
+
+    def put_rendition(self,key,source):
+        return self._put_media(key,source,'audio/mpeg','rendition',MAX_RENDITION)
+
+    def put_artwork(self,key,source):
+        return self._put_media(key,source,'image/jpeg','artwork',5*1024*1024)
