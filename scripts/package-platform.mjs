@@ -28,7 +28,7 @@ const gatewayPath=runtime+'/server.mjs', gatewayOriginal=await readFile(gatewayP
 const gatewayImport="import {pathToFileURL} from 'node:url';";
 const gatewayServer=" return http.createServer(async(req,res)=>";
 const gatewayProxy="  if(local.startsWith('/api/'))return await proxy(req,res,local+url.search);";
-const gatewayMediaHeaders="   for(const name of ['content-type','content-range','accept-ranges','etag','last-modified','content-disposition'])";
+const gatewayMediaHeaders="for(const name of ['content-type','content-range','accept-ranges','etag','last-modified','content-disposition'])";
 if(!gatewayOriginal.includes(gatewayImport)||!gatewayOriginal.includes(gatewayServer)||
    !gatewayOriginal.includes(gatewayProxy)||!gatewayOriginal.includes(gatewayMediaHeaders)||gatewayOriginal.includes('createMobileApiHandler')) {
   throw Error('Canonical gateway changed; abort production packaging and reconcile overlay');
