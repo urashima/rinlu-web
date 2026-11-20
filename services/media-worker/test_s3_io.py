@@ -51,6 +51,17 @@ class S3Tests(unittest.TestCase):
         self.assertIn('/renditions/',opener.calls[0].full_url)
     def test_reject_untrusted_s3_endpoint(self):
         with self.assertRaises(RuntimeError):Storage({**ENV,'RINLU_S3_ENDPOINT':'https://evil.test'})
+    def test_cover_artwork_is_private_jpeg_only(self):
+        opener=FakeOpener();s3=Storage(ENV,opener)
+        key='artwork/'+ID+'/normalized.jpg'
+        with tempfile.TemporaryDirectory() as d:
+            source=Path(d)/'normalized.jpg'
+            source.write_bytes(b'\xff\xd8\xff'+b'X'*1024)
+            uploaded=s3.put_artwork(key,str(source))
+        self.assertEqual(uploaded['storage_key'],key)
+        self.assertEqual(uploaded['storage_provider'],'ovh-s3')
+        self.assertEqual(opener.calls[0].get_header('Content-type'),'image/jpeg')
+        with self.assertRaises(ValueError):s3.put_artwork('artwork/../raw.jpg','/dev/null')
     def test_allow_trusted_analysis_rendition(self):
         opener=FakeOpener();s3=Storage(ENV,opener)
         with tempfile.TemporaryDirectory() as d:
