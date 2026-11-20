@@ -125,10 +125,14 @@ def analyze_rendition(job):
     try:
         with tempfile.TemporaryDirectory(prefix='rinlu-analysis-') as directory:
             source=Path(directory)/'stream.mp3'
-            with request(job['input']) as response:
-                data=response.read(32*1024*1024+1)
-            if len(data)>32*1024*1024: raise ValueError('Rendition too large')
-            source.write_bytes(data)
+            if job.get('storage_provider')=='ovh-s3':
+                if setting('S3_PROCESSOR_MODE')!='1':raise RuntimeError('S3 analysis is not enabled')
+                Storage().read(validate_key(job['input_storage_key'],'rendition'),source,32*1024*1024,'rendition')
+            else:
+                with request(job['input']) as response:
+                    data=response.read(32*1024*1024+1)
+                if len(data)>32*1024*1024: raise ValueError('Rendition too large')
+                source.write_bytes(data)
             raw=command(['ffmpeg','-nostdin','-v','error','-protocol_whitelist','file,pipe','-i',str(source),'-map','0:a:0','-vn','-ac','1','-ar','8000','-f','s16le','pipe:1'],timeout=240)
             analysis=analyze_pcm(raw)
             post(job['complete'],{'hash':job['hash'],'analysis':analysis})
