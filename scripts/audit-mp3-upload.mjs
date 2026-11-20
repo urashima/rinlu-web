@@ -17,3 +17,6 @@ for(const name of names){
  }
  for(const i of [...selected].sort((a,b)=>a-b))console.log('AUDIT',name,i+1,lines[i].slice(0,420));
 }
+
+const extra=(await readFile(root+'/app/rinlu.tsx','utf8')).split('\n');
+for(const i of [448,449,450,452,453,454,455])console.log('AUDIT_FULL_UI',i,extra[i-1].slice(0,9000));
