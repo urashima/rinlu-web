@@ -22,7 +22,7 @@ const response=await fetch(base+'/catalog',{signal:AbortSignal.timeout(20000)});
 if(!response.ok)throw Error('Canonical catalog unavailable, HTTP '+response.status);
 const tracks=(await response.json()).tracks;
 if(!Array.isArray(tracks))throw Error('Canonical catalog does not include tracks');
-const ids=new Set(),errors=[],unavailableStatus={};
+const ids=new Set(),errors=[],unavailableStatus={},errorReasons={};
 let copied=0,skipped=0,unavailable=0,attempted=0;
 for(const track of tracks){
  if(attempted>=max)break;
@@ -45,9 +45,11 @@ for(const track of tracks){
   const info=await authorization.json();
   const mediaUrl=new URL(info.url||'',origin);
   if(mediaUrl.origin!==origin||mediaUrl.pathname!=='/music/api/media/'+track.id||!mediaUrl.searchParams.has('token'))throw Error('Unsafe authorized playback path');
-  const metadata=await fetch(mediaUrl,{method:'HEAD',signal:AbortSignal.timeout(20000)});
+  const metadata=await fetch(mediaUrl,{method:'HEAD',headers:{range:'bytes=0-0'},signal:AbortSignal.timeout(20000)});
   if(!metadata.ok){unavailableStatus['head_'+metadata.status]=(unavailableStatus['head_'+metadata.status]||0)+1;await metadata.body?.cancel();unavailable++;continue;}
-  const size=Number(metadata.headers.get('content-length'));
+  const rangeTotal=(metadata.headers.get('content-range')||'').match(/\/([0-9]+)$/)?.[1];
+  const size=Number(rangeTotal||metadata.headers.get('content-length'));
+  if(metadata.status===206&&!rangeTotal)throw Error('Partial HEAD lacked total byte length');
   if(!Number.isSafeInteger(size)||size<1||size>32*1024*1024)throw Error('Playback size outside permitted limits');
   const key='playback/'+track.id+'/v'+track.version+'-s'+size+'.mp3';
   const exists=await s3.head(key);
@@ -60,10 +62,12 @@ for(const track of tracks){
   copied++;
   console.log('Public track copied and verified: '+copied+'/'+attempted);
  }catch(error){
-  errors.push({id:track.id,type:error?.message?.slice(0,120)||'Unknown'});
+  const reason=String(error?.message||'Unknown').replace(/https?:\/\/\S+/g,'[URL]').slice(0,120);
+  errors.push({id:track.id,type:reason});
+  errorReasons[reason]=(errorReasons[reason]||0)+1;
   console.error('Public S3 import could not finish item '+attempted+': '+(error?.name||'Error'));
  }
  await sleep(350);
 }
-console.log(JSON.stringify({catalog_tracks:tracks.length,attempted,copied,existing:skipped,unavailable,unavailable_status:unavailableStatus,failed:errors.length}));
+console.log(JSON.stringify({catalog_tracks:tracks.length,attempted,copied,existing:skipped,unavailable,unavailable_status:unavailableStatus,failed:errors.length,failure_reasons:errorReasons}));
 if(errors.length||(attempted>0&&copied+skipped===0))process.exitCode=1;
