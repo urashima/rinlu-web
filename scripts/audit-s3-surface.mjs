@@ -33,3 +33,4 @@ for(const p of matched){
    lines++;if(lines>340){console.log('AUDIT_LIMIT');process.exit(0)}
  }
 }
+\nfor (const p of ['lib/media-storage.ts','lib/ovh-media-migration.ts','app/api/[...path]/route.ts','lib/server.ts','lib/media-service.ts','db/schema.ts']) {\n const body=await readFile(join(root,p),'utf8');\n const arr=body.split('\\n');\n console.log('AUDIT_DETAIL',p,'bytes',body.length,'lines',arr.length);\n if (['lib/media-storage.ts','lib/ovh-media-migration.ts','app/api/[...path]/route.ts'].includes(p)) {\n  for(let i=0;i<Math.min(arr.length,190);i++) console.log('DETAIL',p,i+1,arr[i].slice(0,400));\n }else{\n  let n=0;\n  for(let i=0;i<arr.length;i++) if(/media|upload|asset|track|stream|storage|migrat|\\/api\\//i.test(arr[i])) {\n   for(let j=Math.max(0,i-2);j<=Math.min(arr.length-1,i+2);j++){\n    if(n++>110)break;\n    console.log('DETAIL',p,j+1,arr[j].slice(0,400));\n   }\n   if(n>110)break;\n  }\n }\n}\n
