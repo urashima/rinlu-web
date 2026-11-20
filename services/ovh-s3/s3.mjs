@@ -64,6 +64,11 @@ export function createOvhS3(env=process.env,transport=fetch) {
       if(range&&r.status!==206){await r.body?.cancel();throw Error('S3 did not honor Range');}
       return r;
     },
+    async remove(key){
+      const r=await request('DELETE',key);
+      await r.body?.cancel();
+      return r.ok||r.status===404;
+    },
     async verifiedPut(key,bytes,contentType){
       const body=Buffer.from(bytes),sha=digest(body);
       const existing=await this.head(key);
