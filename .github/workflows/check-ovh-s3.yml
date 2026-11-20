@@ -4,6 +4,9 @@ on:
   pull_request:
     paths:
       - deploy.sh
+      - scripts/package-platform.mjs
+      - scripts/verify-ovh-s3.mjs
+      - 'services/ovh-s3/**'
       - scripts/render-ovh-s3-env.mjs
       - scripts/tests/render-ovh-s3-env.test.mjs
       - .github/workflows/deploy.yml
@@ -25,3 +28,22 @@ jobs:
         run: node --test scripts/tests/render-ovh-s3-env.test.mjs
       - name: Validate production shell deployment syntax
         run: bash -n deploy.sh
+      - name: Verify S3 signing and storage bridge logic without secrets
+        run: |
+          node --test services/ovh-s3/tests/*.test.mjs
+          node --check services/ovh-s3/storage-gateway.mjs
+          node --check scripts/package-platform.mjs
+      - name: Build canonical platform with OVH S3 bridge
+        run: |
+          set -euo pipefail
+          node scripts/prepare-platform.mjs
+          npm install --global pnpm@11.25.0
+          cd .platform-source/rinlu-player-source
+          pnpm install --frozen-lockfile
+          pnpm exec vite build --config deployment/platform/vite.config.mjs
+          cd ../..
+          node scripts/package-platform.mjs
+          node --check platform-runtime/server.mjs
+          test -f platform-runtime/ovh-s3.mjs
+          test -f platform-runtime/storage-gateway.mjs
+
