@@ -10,7 +10,7 @@ import {isArtworkJpeg} from './artwork-jpeg';
 const digest=z.string().regex(/^[a-f0-9]{64}$/);
 const completed=z.discriminatedUnion('kind',[
  z.object({
-  kind:z.literal('audio').optional().default('audio'),storage_provider:z.literal('ovh-s3'),
+  kind:z.literal('audio'),storage_provider:z.literal('ovh-s3'),
   input_storage_key:z.string().min(1).max(250),output_storage_key:z.string().min(1).max(250),
   original_sha256:digest,rendition_sha256:digest,rendition_size:z.number().int().min(1).max(32*1024*1024),
   scan:z.literal('clean'),processor_version:z.string().min(1).max(80)
@@ -80,7 +80,7 @@ export async function s3Complete(req:Request,j:Row,inspectMp3:(bytes:Uint8Array,
  if(b.kind==='audio'){
   steps.push(q("UPDATE tracks SET duration=?,updated_at=? WHERE asset_id=? AND EXISTS (SELECT 1 FROM media_jobs WHERE asset_id=tracks.asset_id AND status='complete' AND scan='clean' AND output_key=?)",processing.duration,stamp,j.asset_id,expected));
  }
- steps.push(log('processor','media.s3_processed',j.asset_id,{source_hash:originalHash,output_hash:outputHash,output_key:expected,kind:b.kind}));
+ steps.push(q("INSERT INTO audit SELECT ?,?,?,?,?,? WHERE EXISTS (SELECT 1 FROM media_jobs WHERE id=? AND asset_id=? AND status='complete' AND scan='clean' AND output_key=?)",crypto.randomUUID(),'processor','media.s3_processed',j.asset_id,JSON.stringify({source_hash:originalHash,output_hash:outputHash,output_key:expected,kind:b.kind}),stamp,j.id,j.asset_id,expected));
  const r=await db().batch(steps);
  if(!r[0].meta.changes)fail(409,'The job lease expired or was replaced before completion.');
  return Response.json({ok:true,storage_provider:'ovh-s3',output_key:expected,...processing},{headers:{'Cache-Control':'no-store'}});
