@@ -5,6 +5,8 @@ on:
     paths:
       - deploy.sh
       - scripts/package-platform.mjs
+      - scripts/backfill-ovh-public-media.mjs
+      - scripts/tests/backfill-ovh-public-media.test.mjs
       - scripts/verify-ovh-s3.mjs
       - 'services/ovh-s3/**'
       - scripts/render-ovh-s3-env.mjs
@@ -31,6 +33,7 @@ jobs:
       - name: Verify S3 signing and storage bridge logic without secrets
         run: |
           node --test services/ovh-s3/tests/*.test.mjs
+          node --test scripts/tests/backfill-ovh-public-media.test.mjs
           node --check services/ovh-s3/storage-gateway.mjs
           node --check scripts/package-platform.mjs
       - name: Build canonical platform with OVH S3 bridge
