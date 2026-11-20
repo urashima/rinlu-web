@@ -49,7 +49,8 @@ async function scannerReady(){
 }
 async function readiness(){
  const config=s3Configuration();
- if(!config||!await scannerReady())fail(503,'The private S3 database and scanner are not ready.');
+ if(!config)fail(503,'The private S3 storage configuration is not ready.');
+ if(!await scannerReady())fail(503,'The private S3 malware scanner is not ready.');
  const pendingLegacy=await one("SELECT COUNT(*) n FROM media_jobs j JOIN assets a ON a.id=j.asset_id WHERE j.status IN ('pending','processing') AND a.storage_key NOT LIKE 'originals/%'");
  if(Number(pendingLegacy?.n||0)>0)fail(503,'Existing R2 processing jobs must finish before new primary writes.');
  return {contract:'rinlu-s3-primary-v1',provider:'ovh-s3',bucket:config.bucket,
@@ -61,8 +62,9 @@ export async function s3PrimaryRoute(req:Request,p:string[],u:Row|null):Promise<
  if(p[2]==='capabilities'&&req.method==='GET')return json(await readiness());
  if(p[2]!=='commit'||req.method!=='POST')fail(404,'S3 storage endpoint not found.');
  if(!u||u.status!=='active')fail(401,'Sign in before uploading.');
+ const account=u!;
  await readiness();
- const policy=await one('SELECT version FROM consents WHERE user_id=? AND version=?',u.id,POLICY_VERSION);
+ const policy=await one('SELECT version FROM consents WHERE user_id=? AND version=?',account.id,POLICY_VERSION);
  if(!policy)fail(428,'Accept the current contributor agreement before uploading.');
  const conf=await publicConfig();
  if(!conf.uploads_open||conf.maintenance_mode)fail(503,'Uploads are paused.');
@@ -71,18 +73,18 @@ export async function s3PrimaryRoute(req:Request,p:string[],u:Row|null):Promise<
  if(b.content_type!==(b.kind==='audio'?'audio/mpeg':'image/jpeg'))fail(415,'Invalid media content type.');
  const max=b.kind==='audio'?limits.audio_bytes:Math.min(limits.artwork_bytes,artworkJpegMaxBytes);
  if(b.size>max)fail(413,'File exceeds the current media allowance.');
- const key=s3PrimaryKey(u.id,b.asset_id);
+ const key=s3PrimaryKey(account.id,b.asset_id);
  if(b.storage_key!==key)fail(403,'Storage key must belong to the authenticated uploader.');
  const old=await one('SELECT * FROM assets WHERE id=?',b.asset_id);
  if(old){
    let meta:any={};try{meta=JSON.parse(old.metadata||'{}')}catch{}
-   if(old.owner_id!==u.id||old.storage_key!==key||old.size!==b.size||old.kind!==b.kind||meta.upload_ticket_nonce!==b.upload_ticket_nonce){
+   if(old.owner_id!==account.id||old.storage_key!==key||old.size!==b.size||old.kind!==b.kind||meta.upload_ticket_nonce!==b.upload_ticket_nonce){
      fail(409,'An asset with this ID already belongs to another upload.');
    }
    return json({id:b.asset_id,hash:old.hash,mime:old.mime,size:old.size,
      storage_provider:'ovh-s3',storage_key:key,processing_state:'pending_scan',review_status:'pending'});
  }
- const usage=await one('SELECT COALESCE(SUM(size),0) n FROM assets WHERE owner_id=?',u.id);
+ const usage=await one('SELECT COALESCE(SUM(size),0) n FROM assets WHERE owner_id=?',account.id);
  if(Number(usage?.n||0)+b.size>limits.storage_bytes)fail(413,'Your storage allowance is full.');
  const head=await mediaStorage.head(key);
  if(!head||head.size!==b.size)fail(409,'The S3 original has not been verified.');
@@ -100,15 +102,15 @@ export async function s3PrimaryRoute(req:Request,p:string[],u:Row|null):Promise<
    upload_ticket_nonce:b.upload_ticket_nonce,normalized_jpeg:false,uploaded_via:'s3-primary-v1'});
  // D1 batch ensures the asset row, pending scan job and audit entry agree.
  const inserted=await db().batch([
-   q('INSERT OR IGNORE INTO assets VALUES (?,?,?,?,?,?,?,?,?,?)',b.asset_id,u.id,b.kind,
+   q('INSERT OR IGNORE INTO assets VALUES (?,?,?,?,?,?,?,?,?,?)',b.asset_id,account.id,b.kind,
      b.content_type,b.size,digest,key,b.original_name,metadata,time),
    q("INSERT OR IGNORE INTO media_jobs (id,asset_id,status,created_at,updated_at) SELECT ?,?,'pending',?,? WHERE EXISTS (SELECT 1 FROM assets WHERE id=? AND owner_id=? AND storage_key=?)",
-     crypto.randomUUID(),b.asset_id,time,time,b.asset_id,u.id,key),
-   log(u.id,'asset.s3_primary_registered',b.asset_id,{kind:b.kind,size:b.size,sha256:digest,storage_key:key})
+     crypto.randomUUID(),b.asset_id,time,time,b.asset_id,account.id,key),
+   log(account.id,'asset.s3_primary_registered',b.asset_id,{kind:b.kind,size:b.size,sha256:digest,storage_key:key})
  ]);
  if(!inserted[0].meta.changes){
    const concurrent=await one('SELECT * FROM assets WHERE id=?',b.asset_id);
-   if(!concurrent||concurrent.storage_key!==key||concurrent.owner_id!==u.id)fail(409,'Concurrent asset registration conflict.');
+   if(!concurrent||concurrent.storage_key!==key||concurrent.owner_id!==account.id)fail(409,'Concurrent asset registration conflict.');
  }
  return json({id:b.asset_id,hash:digest,mime:b.content_type,size:b.size,
    storage_provider:'ovh-s3',storage_key:key,processing_state:'pending_scan',review_status:'pending'},201);
