@@ -21,7 +21,9 @@ test('empty by default, administrator authorization, upload, crawler metadata an
  const url='http://127.0.0.1:'+server.address().port;
  const get=(path,opts)=>fetch(url+path,opts);
  try{
-  let r=await get('/music/');assert.equal(r.status,200);assert.doesNotMatch(await r.text(),/og:image/);
+  let r=await get('/music/admin/share-image',{redirect:'manual'});
+  assert.equal(r.status,302);assert.equal(r.headers.get('location'),'/music/admin/site-fonts');
+  r=await get('/music/');assert.equal(r.status,200);assert.doesNotMatch(await r.text(),/og:image/);
   r=await get('/music/api/admin/share-image');assert.equal(r.status,401);
   r=await get('/music/api/admin/share-image',{headers:{Authorization:'Bearer fan'}});assert.equal(r.status,403);
   r=await get('/music/api/admin/share-image',{headers:{Authorization:'Bearer admin'}});
