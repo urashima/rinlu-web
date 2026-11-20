@@ -1,0 +1,22 @@
+name: Inspect RINLU admin configuration and MP3 upload source
+on:
+  push:
+    branches: [feature/admin-live-audio-format-policy]
+    paths:
+      - 'scripts/inspect-live-audio-policy.mjs'
+      - '.github/workflows/inspect-live-audio-policy.yml'
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Retrieve the exact canonical release
+        run: node scripts/prepare-platform.mjs
+      - name: Inspect D1 admin policy endpoints and upload admission code
+        run: node scripts/inspect-live-audio-policy.mjs
