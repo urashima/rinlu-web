@@ -13,6 +13,7 @@ export function createStorageGateway({s3,backendOrigin,publicOrigin,accountBeare
  if(!s3)return null;
  const uploadEnabled=env.RINLU_S3_UPLOAD_MIRROR==='1';
  const playbackEnabled=env.RINLU_S3_PLAYBACK_CACHE==='1';
+ const primaryOnly=env.RINLU_S3_PRIMARY_ONLY==='1';
  const direct=createDirectStorage({s3,backendOrigin,publicOrigin,accountBearer,env,transport});
  const active=new Map();
  let uploads=0,cacheJobs=0;
@@ -132,6 +133,11 @@ export function createStorageGateway({s3,backendOrigin,publicOrigin,accountBeare
   enabled:{upload:uploadEnabled,playback:playbackEnabled},
   async handle(req,res,local,url){
    if(direct&&await direct.handle(req,res,local,url))return true;
+   // Never allow old multipart upload to make a fresh R2 write after the single-primary cutover.
+   if(primaryOnly&&local==='/api/upload'&&req.method==='POST'){
+    send(res,426,{error:'Legacy upload is disabled. Use authenticated S3 direct upload.'});
+    return true;
+   }
    if(uploadEnabled&&local==='/api/upload'&&req.method==='POST'){await upload(req,res);return true;}
    if(playbackEnabled&&local.startsWith('/api/media/'))return playback(req,res,local,url);
    return false;
