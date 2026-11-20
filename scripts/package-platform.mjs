@@ -38,7 +38,7 @@ const gatewayPatched=gatewayOriginal
   .replace(gatewayServer," const mobileApi=createMobileApiHandler({backendOrigin});\n const s3Bridge=createStorageGateway({s3:createOvhS3(process.env),backendOrigin,publicOrigin,accountBearer});\n"+gatewayServer)
   .replace(gatewayProxy,
     "  if(local.startsWith('/api/mobile/v1/'))return await mobileApi(req,res,url,accountBearer(req),send);\n  if(local.startsWith('/api/')){if(s3Bridge&&await s3Bridge.handle(req,res,local,url))return;return await proxy(req,res,local+url.search);}" )
-  .replace(gatewayMediaHeaders,gatewayMediaHeaders+"\\n   if(path.startsWith('/api/media/')&&response.headers.has('content-length'))res.setHeader('Content-Length',response.headers.get('content-length'));");
+  .replace(gatewayMediaHeaders,gatewayMediaHeaders+"\n   if(path.startsWith('/api/media/')&&response.headers.has('content-length'))res.setHeader('Content-Length',response.headers.get('content-length'));");
 await writeFile(gatewayPath,gatewayPatched);
 await writeFile(runtime+'/mobile-api.mjs',mobileSource);
 await writeFile(runtime+'/ovh-s3.mjs',s3Source);
