@@ -1,0 +1,19 @@
+name: Verify canonical S3-only readiness (read only)
+on:
+  pull_request:
+    paths:
+      - 'scripts/verify-canonical-s3-primary.mjs'
+      - '.github/workflows/verify-canonical-s3-primary.yml'
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Confirm canonical D1 and scanner S3-only production contract
+        run: node scripts/verify-canonical-s3-primary.mjs
