@@ -76,3 +76,19 @@ test('unauthorized audio is never served from S3',async()=>{
  assert.equal(await bridge.handle(req,res,'/api/media/'+TRACK,new URL('https://rinlu.com/music/api/media/'+TRACK+'?token=invalid')),false);
  assert.equal(reads,0);
 });
+
+test('primary-only mode refuses legacy multipart route before any R2 upload',async()=>{
+ let called=0;
+ const bridge=createStorageGateway({
+  s3:{},backendOrigin:'https://canonical.example',publicOrigin:'https://rinlu.com',
+  accountBearer:()=> 'Bearer TEST',
+  env:{RINLU_S3_PRIMARY_ONLY:'1',RINLU_S3_UPLOAD_MIRROR:'1'},
+  transport:async()=>{called++;throw Error('Legacy upstream must not be called');}
+ });
+ const request=incoming(Buffer.from('multipart-not-needed'),'POST',{origin:'https://rinlu.com','content-type':'multipart/form-data; boundary=x'});
+ const result=outgoing();
+ assert.equal(await bridge.handle(request,result,'/api/upload',new URL('https://rinlu.com/music/api/upload')),true);
+ assert.equal(result.statusCode,426);
+ assert.equal(called,0);
+ assert.match(await collect(result),/Legacy upload is disabled/);
+});
