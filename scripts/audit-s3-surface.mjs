@@ -16,7 +16,7 @@ const files=await walk();
 console.log('AUDIT_FILES',files.length);
 const matched=files.filter(p=>/upload|storage|media|catalog|server|api|asset|track|schema|client|service|auth/i.test(p));
 console.log('AUDIT_NAMES',matched.join('\n'));
-const rx=/upload|\.put\(|\.get\(|R2|S3|presign|/api/|/assets|/media|audioUrl|audio_url|fileUrl|file_url|stream|blob|assetKey|objectKey|storage|createServer|proxy\(/i;
+const rx=/upload|\.put\(|\.get\(|R2|S3|presign|\\/api\\/|\\/assets|\\/media|audioUrl|audio_url|fileUrl|file_url|stream|blob|assetKey|objectKey|storage|createServer|proxy\(/i;
 let lines=0;
 for(const p of matched){
  if(!/^(app|deployment|server|worker|api|src)\//.test(p))continue;
