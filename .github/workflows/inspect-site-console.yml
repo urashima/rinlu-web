@@ -1,4 +1,4 @@
-name: RINLU temporary Site Console source inspection
+name: RINLU temporary Site Console build verification
 on:
   push:
     branches: ['feature/console-site-share-20261120']
@@ -6,42 +6,46 @@ on:
 permissions:
   contents: read
 jobs:
-  inspect:
+  verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 18
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - name: Inspect Platform Console UI anchors (read-only)
+      - name: Validate share API and source overlay
         run: |
           set -euo pipefail
+          node --check scripts/apply-platform-site.mjs
+          node --check services/share-preview/share-preview.mjs
+          node --test services/share-preview/share-preview.test.mjs
           node scripts/prepare-platform.mjs
           python3 - <<'PY'
           from pathlib import Path
           root=Path('.platform-source/rinlu-player-source/app')
-          terms=['Site fonts','Platform Console','site-font','siteFont','site fonts']
-          for p in sorted(root.rglob('*')):
-           if p.suffix not in ('.ts','.tsx','.jsx','.js'):continue
-           lines=p.read_text(encoding='utf-8').splitlines()
-           indices=[i for i,line in enumerate(lines) if any(term in line for term in terms)]
-           if not indices:continue
-           print('FILE',p,'LINE COUNT',len(lines),'MATCHES',[i+1 for i in indices][:30])
-           shown=set()
-           for i in indices[:12]:
-            for j in range(max(0,i-12),min(len(lines),i+19)):
-             if j not in shown:
-              print(f'{j+1:5}: {lines[j][:340]}')
-              shown.add(j)
-           print('END FILE')
-          p=Path('.platform-source/rinlu-player-source/app/rinlu.tsx')
-          lines=p.read_text(encoding='utf-8').splitlines()
-          print('BEGIN ADMIN-COMPONENT')
-          for no in range(458,466): print(str(no+1)+': '+lines[no][:22000])
-          print('END ADMIN-COMPONENT')
-          p=Path('.platform-source/rinlu-player-source/app/site-font-admin.tsx')
-          print('BEGIN SITE-FONTS-COMPONENT')
-          for no,line in enumerate(p.read_text(encoding='utf-8').splitlines(),1): print(str(no)+': '+line[:2000])
-          print('END SITE-FONTS-COMPONENT')
+          console=(root/'rinlu.tsx').read_text()
+          page=(root/'site-font-admin.tsx').read_text()
+          component=(root/'site-share-admin.tsx').read_text()
+          assert "['site-fonts',tr('Site'),Settings]" in console
+          assert "['site-fonts',tr('Site fonts'),Settings]" not in console
+          assert "tr('Site')" in page and '<SiteShareAdmin/>' in page
+          assert 'Save share image' in component and 'Remove image' in component
+          print('INTEGRATED SITE CONSOLE SOURCE VERIFIED')
           PY
+      - name: Compile canonical client and Docker gateway without deployment
+        run: |
+          set -euo pipefail
+          npm install --global pnpm@11.25.0
+          cd .platform-source/rinlu-player-source
+          pnpm install --frozen-lockfile
+          pnpm exec vite build --config deployment/platform/vite.config.mjs
+          cd ../..
+          node scripts/package-platform.mjs
+          node --check platform-runtime/server.mjs
+          node --check platform-runtime/share-preview.mjs
+          node -e "const r=require('./platform-runtime/public/_release.json');if(r.site_overlay!=='console-site-share-v1')process.exit(1)"
+          test -f platform-runtime/public/source/site-share-admin.tsx
+          test ! -f platform-runtime/public/share-admin.js
+          if grep -q '/music/share-admin.js' platform-runtime/public/index.html; then exit 1; fi
+          echo 'RINLU SITE CONSOLE FULL BUILD VERIFIED'
