@@ -30,12 +30,19 @@ for(const track of tracks){
  ids.add(track.id);attempted++;
  try{
   let authorization;
-  for(let retry=0;retry<3;retry++){
-   authorization=await fetch(base+'/playback/authorize',{
-    method:'POST',headers:{'content-type':'application/json','origin':origin},
-    body:JSON.stringify({track_id:track.id}),signal:AbortSignal.timeout(20000)});
-   if(authorization.status!==429)break;
-   await sleep((retry+1)*5000);
+  for(let retry=0;retry<5;retry++){
+   try{
+    authorization=await fetch(base+'/playback/authorize',{
+     method:'POST',headers:{'content-type':'application/json','origin':origin},
+     body:JSON.stringify({track_id:track.id}),signal:AbortSignal.timeout(20000)});
+   }catch(error){
+    if(retry===4)throw error;
+    await sleep((retry+1)*3000);
+    continue;
+   }
+   if(![429,502,503,504].includes(authorization.status)||retry===4)break;
+   await authorization.body?.cancel();
+   await sleep((retry+1)*3000);
   }
   if(!authorization.ok){
    await authorization.body?.cancel();
@@ -67,7 +74,7 @@ for(const track of tracks){
   errorReasons[reason]=(errorReasons[reason]||0)+1;
   console.error('Public S3 import could not finish item '+attempted+': '+(error?.name||'Error'));
  }
- await sleep(350);
+ await sleep(1000);
 }
 console.log(JSON.stringify({catalog_tracks:tracks.length,attempted,copied,existing:skipped,unavailable,unavailable_status:unavailableStatus,failed:errors.length,failure_reasons:errorReasons}));
-if(errors.length||(attempted>0&&copied+skipped===0))process.exitCode=1;
+if(errors.length||unavailable||(attempted>0&&copied+skipped===0))process.exitCode=1;

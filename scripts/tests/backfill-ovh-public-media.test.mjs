@@ -7,4 +7,7 @@ test('Public OVH import uses canonical playback authorization endpoint',()=>{
  assert.ok(!source.includes("base+'/authorize'"));
  assert.ok(source.includes("attempted>0&&copied+skipped===0"));
  assert.ok(source.includes("s3.verifiedPut(key,bytes,'audio/mpeg')"));
+ assert.ok(source.includes('[429,502,503,504]'));
+ assert.ok(source.includes('if(errors.length||unavailable'));
+
 });
