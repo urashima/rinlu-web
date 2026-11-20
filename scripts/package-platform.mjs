@@ -20,6 +20,9 @@ await cp(source + '/platform-dist', runtime + '/public', {recursive: true});
 // OVH-only read-only mobile API: the canonical Sites/D1 source remains untouched.
 // The gateway's additional corresponding source is published separately.
 const brandSource=await readFile('scripts/apply-platform-brand.mjs','utf8');
+const siteOverlaySource=await readFile('scripts/apply-platform-site.mjs','utf8');
+const siteSettingsComponent=await readFile('scripts/site-console/site-share-admin.tsx','utf8');
+const siteOverlayHash=createHash('sha256').update(siteOverlaySource).digest('hex');
 const directOverlaySource=await readFile('scripts/apply-platform-direct.mjs','utf8');
 const directOverlayHash=createHash('sha256').update(directOverlaySource).digest('hex');
 const brandOverlayHash=createHash('sha256').update(brandSource).digest('hex');
@@ -73,7 +76,9 @@ const enrichedRelease={...release,gateway_overlay_sha256:gatewayOverlayHash,
   direct_overlay_sha256:directOverlayHash,
   direct_overlay:'s3-browser-direct-v1',
   brand_overlay_sha256:brandOverlayHash,
-  brand_overlay:'madimi-one-wordmark-v1'};
+  brand_overlay:'madimi-one-wordmark-v1',
+  site_overlay_sha256:siteOverlayHash,
+  site_overlay:'console-site-share-v1'};
 await writeFile(runtime+'/public/_release.json',JSON.stringify(enrichedRelease)+'\n');
 
 
@@ -87,17 +92,13 @@ await cp('scripts/privacy-footer.js', runtime + '/public/privacy-footer.js');
 await writeFile(indexPath, indexHtml.replace('</body>', '<script defer src="/music/privacy-footer.js"></script>\n</body>'));
 
 
-// Inject a tiny admin navigation script; OG metadata is rendered by the gateway at request time.
-const shareIndex=await readFile(indexPath,'utf8');
-if(shareIndex.includes('/music/share-admin.js'))throw Error('Duplicate share admin script');
-await cp('scripts/share-admin.js',runtime+'/public/share-admin.js');
-await writeFile(indexPath,shareIndex.replace('</body>','<script defer src="/music/share-admin.js"></script>\n</body>'));
-
 const destination = runtime + '/public/source';
 await mkdir(destination, {recursive: true});
 await cp(archivePath, destination + '/rinlu-player-source.tar.gz');
 await cp('services/share-preview/share-preview.mjs',destination+'/share-preview.mjs');
-await cp('scripts/share-admin.js',destination+'/share-admin.js');
+await writeFile(destination+'/site-console-overlay.mjs',siteOverlaySource);
+await writeFile(destination+'/site-console-overlay.sha256',siteOverlayHash+'  site-console-overlay.mjs\n');
+await writeFile(destination+'/site-share-admin.tsx',siteSettingsComponent);
 await writeFile(destination+'/brand-wordmark-overlay.mjs',brandSource);
 await writeFile(destination+'/brand-wordmark-overlay.sha256',brandOverlayHash+'  brand-wordmark-overlay.mjs\n');
 await writeFile(destination+'/mobile-api-gateway.mjs',mobileSource);
