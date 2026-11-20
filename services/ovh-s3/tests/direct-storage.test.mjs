@@ -28,7 +28,7 @@ function fakeStore(){
  };
 }
 test('browser signed POST requires owner session and exact content length; complete stores canonical object',async()=>{
- const store=fakeStore(),file=Buffer.from('valid_mp3_placeholder_testing!'),hash=createHash('sha256').update(file).digest('hex');
+ const store=fakeStore(),file=Buffer.alloc(120,7),hash=createHash('sha256').update(file).digest('hex');
  const transport=async(url,{method,body})=>{
   if(new URL(url).pathname==='/api/me')return Response.json({user:{id:ID,role:'artist',status:'active'}});
   if(new URL(url).pathname==='/api/upload'){
@@ -43,7 +43,7 @@ test('browser signed POST requires owner session and exact content length; compl
  const bridge=createDirectStorage({s3:store,backendOrigin:'https://old.example',publicOrigin:'https://rinlu.com',accountBearer:()=> 'Bearer TEST',env:opts,transport});
  const req=incoming({kind:'audio',size:100,name:'track.mp3'},'/api/storage/direct/init'),res=output();
  // Use file >100 bytes: policy requires min=100.
- const staged=Buffer.alloc(120,7);
+ const staged=file;
  const ticketReq=incoming({kind:'audio',size:staged.length,name:'track.mp3'},'/api/storage/direct/init'),ticketRes=output();
  assert.equal(await bridge.handle(ticketReq,ticketRes,'/api/storage/direct/init'),true);
  const grant=await parse(ticketRes);
@@ -51,10 +51,14 @@ test('browser signed POST requires owner session and exact content length; compl
  const policy=JSON.parse(Buffer.from(grant.upload.fields.policy,'base64').toString('utf8'));
  assert.ok(policy.conditions.some(x=>Array.isArray(x)&&x[0]==='content-length-range'&&x[1]===staged.length&&x[2]===staged.length));
  store.objects.set(grant.upload.fields.key,staged);
- // Changing stored bytes makes canonical return wrong checksum: completion must refuse.
  const completeReq=incoming({ticket:grant.ticket,kind:'audio'},'/api/storage/direct/complete'),completeRes=output();
- // The canonical mock returns a hash for different bytes, exercising fail-closed behavior.
- await assert.rejects(bridge.handle(completeReq,completeRes,'/api/storage/direct/complete'),/integrity/);
+ assert.equal(await bridge.handle(completeReq,completeRes,'/api/storage/direct/complete'),true);
+ assert.equal(completeRes.statusCode,201);
+ const finished=await parse(completeRes);
+ assert.equal(finished.id,ASSET);
+ assert.equal(finished.storage,'ovh-s3-direct-upload');
+ assert.deepEqual(store.objects.get(ID+'/'+ASSET),staged);
+ assert.equal(store.objects.has(grant.upload.fields.key),false);
 });
 test('signed S3 playback requires original authorization and preserves legacy probe URL',async()=>{
  const store=fakeStore();const key='playback/'+TRACK+'/v2-s1024.mp3';store.objects.set(key,Buffer.alloc(1024));
