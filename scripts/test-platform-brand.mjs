@@ -8,7 +8,7 @@ test('RINLU visible wordmarks are lowercase and only those elements changed',asy
  const access=await file('app/guest-access.tsx');
  assert.match(shell,/<span className="brand-name">rinlu<\/span>/);
  assert.match(shell,/className="mobile-wordmark"[^>]*>rinlu<\/A>/);
- assert.match(access,/className="access-wordmark"[^>]*>rinlu<\/div>/);
+ assert.match(access,/className="access-wordmark"><AudioLines[^>]*\/>rinlu<\/div>/);
  assert.doesNotMatch(shell,/<span className="brand-name">RINLU<\/span>/);
  assert.doesNotMatch(shell,/className="mobile-wordmark"[^>]*>RINLU<\/A>/);
  assert.match(shell,/aria-label="RINLU"/);
