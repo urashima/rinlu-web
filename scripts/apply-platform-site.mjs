@@ -26,12 +26,12 @@ export async function applyPlatformSite(root){
   "import {useTranslation} from './localization-provider';\nimport {SiteShareAdmin} from './site-share-admin';",
   'app/site-font-admin.tsx import');
  source=replaceOnce(source,
-  "  return <section className=\"panel\">\n     <h2>{tr('Site fonts')}</h2>",
+  "  return <section className=\"panel\">\n    <h2>{tr('Site fonts')}</h2>",
   "  return <div className=\"site-settings\">\n   <h2>{tr('Site')}</h2>\n   <section className=\"panel\">\n     <h3>{tr('Typography')}</h3>",
   'app/site-font-admin.tsx heading');
  source=replaceOnce(source,
-  "   </section>;\n}",
-  "   </section>\n   <SiteShareAdmin/>\n  </div>;\n}",
+  "  </section>;\n}",
+  "  </section>\n  <SiteShareAdmin/>\n  </div>;\n}",
   'app/site-font-admin.tsx ending');
  await writeFile(componentPath,source);
  await copyFile('scripts/site-console/site-share-admin.tsx',join(app,'site-share-admin.tsx'));
