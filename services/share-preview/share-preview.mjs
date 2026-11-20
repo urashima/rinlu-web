@@ -81,7 +81,7 @@ export function createSharePreview({s3,backendOrigin,publicOrigin,accountBearer,
   return json(res,200,{enabled:false,imageUrl:null});
  }
  function adminPage(){
-  return \`<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>分享图 — RINLU</title><style>
+  return `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>分享图 — RINLU</title><style>
   :root{color-scheme:dark;font-family:system-ui,-apple-system,sans-serif}*{box-sizing:border-box}
   body{background:#0d111e;color:#fff;margin:0}main{max-width:720px;margin:8vh auto;padding:0 20px}
   a{color:#a7bcff}h1{margin-top:36px}p{color:#aeb8d0;line-height:1.7}
@@ -96,7 +96,7 @@ export function createSharePreview({s3,backendOrigin,publicOrigin,accountBearer,
   <input id="file" type="file" accept="image/jpeg,image/png,image/webp">
   <button id="save" disabled>保存分享图</button><button id="clear" disabled>清除配置</button>
   <p id="status" role="status"></p><small>JPEG / PNG / WebP，最大 4 MB。社交平台的旧分享预览可能存在缓存。</small>
-  </section></main><script defer src="/music/share-admin.js"></script></body></html>\`;
+  </section></main><script defer src="/music/share-admin.js"></script></body></html>`;
  }
  async function image(req,res,url){
   if(!s3){res.writeHead(404);res.end();return;}
