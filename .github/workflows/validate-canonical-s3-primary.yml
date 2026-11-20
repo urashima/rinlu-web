@@ -45,6 +45,10 @@ jobs:
           if(!media.includes('s3Complete(req,j,inspectMp3)')||!media.includes('s3JobClaim(j,asset)'))throw Error('S3 private processor not connected');
           if(!store.includes('S3 keys cannot be deleted')||!store.includes('Legacy R2 media writes are disabled'))throw Error('R2 read-only preservation missing');
           JS
+      - name: Run canonical TypeScript type checker
+        run: |
+          cd .platform-source/rinlu-player-source
+          pnpm exec tsc --noEmit --pretty false
       - name: Build current frontend and preserve legacy app routes
         run: |
           cd .platform-source/rinlu-player-source
