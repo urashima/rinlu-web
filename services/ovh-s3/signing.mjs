@@ -1,7 +1,7 @@
 /** Server-only S3 SigV4 GET presigner and exact-key browser POST policy.
  * The caller must enforce account permissions; no bucket ACL is made public.
  */
-import {createHash,createHmac,randomBytes} from 'node:crypto';
+import {createHash,createHmac,randomBytes,timingSafeEqual} from 'node:crypto';
 const hash=(value)=>createHash('sha256').update(value).digest('hex');
 const hmac=(key,value)=>createHmac('sha256',key).update(value).digest();
 const escape=(value)=>encodeURIComponent(value).replace(/[!'()*]/g,c=>'%'+c.charCodeAt(0).toString(16).toUpperCase());
@@ -74,7 +74,7 @@ export function verifyTicket(secret,ticket,now=Date.now()){
  if(!encoded||!signature||extra!==undefined)throw Error('Malformed direct upload ticket');
  const expected=createHmac('sha256',secret).update(encoded).digest();
  const supplied=Buffer.from(signature,'base64url');
- if(supplied.length!==expected.length||!createHash('sha256').update(expected).digest().equals(createHash('sha256').update(supplied).digest()))throw Error('Invalid direct upload ticket signature');
+ if(supplied.length!==expected.length||!timingSafeEqual(expected,supplied))throw Error('Invalid direct upload ticket signature');
  let payload;
  try{payload=JSON.parse(Buffer.from(encoded,'base64url').toString('utf8'))}catch{throw Error('Malformed direct upload ticket payload')}
  if(!Number.isSafeInteger(payload?.expires)||payload.expires<=now)throw Error('Direct upload ticket expired');
