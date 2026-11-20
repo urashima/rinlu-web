@@ -16,4 +16,6 @@ jobs:
         with:
           node-version: '24'
       - run: node scripts/prepare-platform.mjs
+        env:
+          RINLU_SOURCE_AUDIT_ONLY: '1'
       - run: node scripts/audit-primary-storage.mjs
