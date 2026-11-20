@@ -1,0 +1,38 @@
+name: RINLU temporary Site Console source inspection
+on:
+  push:
+    branches: ['feature/console-site-share-20261120']
+    paths: ['.github/workflows/inspect-site-console.yml']
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Inspect Platform Console UI anchors (read-only)
+        run: |
+          set -euo pipefail
+          node scripts/prepare-platform.mjs
+          python3 - <<'PY'
+          from pathlib import Path
+          root=Path('.platform-source/rinlu-player-source/app')
+          terms=['Site fonts','Platform Console','site-font','siteFont','site fonts']
+          for p in sorted(root.rglob('*')):
+           if p.suffix not in ('.ts','.tsx','.jsx','.js'):continue
+           lines=p.read_text(encoding='utf-8').splitlines()
+           indices=[i for i,line in enumerate(lines) if any(term in line for term in terms)]
+           if not indices:continue
+           print('FILE',p,'LINE COUNT',len(lines),'MATCHES',[i+1 for i in indices][:30])
+           shown=set()
+           for i in indices[:12]:
+            for j in range(max(0,i-12),min(len(lines),i+19)):
+             if j not in shown:
+              print(f'{j+1:5}: {lines[j][:340]}')
+              shown.add(j)
+           print('END FILE')
+          PY
