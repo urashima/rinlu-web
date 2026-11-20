@@ -69,7 +69,54 @@ def heartbeat():
         ready['s3_primary']='ready'
     post('/api/service/heartbeat', ready)
 
+def process_artwork(job):
+    """S3-only normalized JPEG, antivirus, dimensions and metadata-only D1 completion."""
+    lease=job['lease']
+    try:
+        if setting('S3_PROCESSOR_MODE')!='1':raise RuntimeError('S3 artwork scanning is disabled')
+        store=Storage()
+        with tempfile.TemporaryDirectory(prefix='rinlu-artwork-') as directory:
+            source=Path(directory)/'original.jpg';output=Path(directory)/'normalized.jpg'
+            meta=store.read(validate_key(job['input_storage_key'],'original'),source,5*1024*1024)
+            scan(source)
+            with source.open('rb') as image:
+                if not image.read(3).startswith(b'\xff\xd8\xff'):raise RuntimeError('Only JPEG cover artwork is supported')
+            details=json.loads(command(['ffprobe','-v','error','-f','image2',
+                '-show_entries','stream=codec_name,width,height','-of','json',str(source)],timeout=90))
+            frames=details.get('streams',[])
+            if len(frames)!=1 or frames[0].get('codec_name')!='mjpeg':
+                raise RuntimeError('Unsupported cover art stream')
+            width=int(frames[0].get('width',0));height=int(frames[0].get('height',0))
+            if min(width,height)<500 or max(width,height)>8192 or abs(width/height-1)>.05:
+                raise RuntimeError('Cover artwork must be square and between 500 and 8192 pixels')
+            command(['ffmpeg','-nostdin','-v','error','-protocol_whitelist','file,pipe',
+                '-f','image2','-i',str(source),'-frames:v','1','-map_metadata','-1',
+                '-q:v','3','-y','-f','image2',str(output)],timeout=120)
+            if not output.is_file() or output.stat().st_size>5*1024*1024:
+                raise RuntimeError('Normalized cover exceeds 5 MB')
+            scan(output)
+            uploaded=store.put_artwork(validate_key(job['output_storage_key'],'artwork'),output)
+            post(job['complete'],{
+                'storage_provider':'ovh-s3',
+                'kind':'artwork',
+                'input_storage_key':job['input_storage_key'],
+                'output_storage_key':uploaded['storage_key'],
+                'original_sha256':meta['sha256'],
+                'normalized_sha256':uploaded['sha256'],
+                'normalized_size':uploaded['size'],
+                'width':width,'height':height,
+                'scan':'clean','processor_version':'s3-primary-image-v1'
+            },lease)
+            print(json.dumps({'job':job['id'],'status':'artwork_complete'}),flush=True)
+    except Exception as error:
+        infected=str(error)=='infected'
+        post(job['fail'],{'error':'Malware detected' if infected else str(error)[:500],
+             'scan':'infected' if infected else 'error'},lease)
+        print(json.dumps({'job':job['id'],'status':'artwork_failed'}),flush=True)
+
 def process(job):
+    if job.get('storage_provider')=='ovh-s3' and job.get('kind')=='artwork':
+        return process_artwork(job)
     lease=job['lease']
     try:
         with tempfile.TemporaryDirectory(prefix='sonora-') as directory:
