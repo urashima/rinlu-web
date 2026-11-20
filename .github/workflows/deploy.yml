@@ -159,6 +159,10 @@ jobs:
           OVH_S3_PLAYBACK_CACHE: ${{ vars.OVH_S3_PLAYBACK_CACHE }}
           OVH_S3_DIRECT_UPLOAD: ${{ vars.OVH_S3_DIRECT_UPLOAD }}
           OVH_S3_DIRECT_PLAYBACK: ${{ vars.OVH_S3_DIRECT_PLAYBACK }}
+          RINLU_CDN_ENABLED: ${{ vars.RINLU_CDN_ENABLED }}
+          RINLU_CDN_BASE_URL: ${{ vars.RINLU_CDN_BASE_URL }}
+          RINLU_CDN_SIGNING_KEY: ${{ secrets.RINLU_CDN_SIGNING_KEY }}
+          RINLU_CDN_ORIGIN_TOKEN: ${{ secrets.RINLU_CDN_ORIGIN_TOKEN }}
           HOST: ${{ secrets.OVH_HOST }}
           USER: ${{ secrets.OVH_USER }}
           PORT: ${{ vars.OVH_SSH_PORT || '22' }}
