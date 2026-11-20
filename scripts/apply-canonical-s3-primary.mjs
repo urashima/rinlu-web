@@ -29,11 +29,11 @@ await replaceFile('lib/server.ts',source=>{
  source=once(source,upload,upload+
    "    if((env as any).RINLU_S3_ONLY==='1')fail(426,'Legacy R2 uploads are disabled. Upload directly to OVH S3.');\n",
    'disable R2 upload entry');
- const processed="  if(processed)asset={...asset,storage_key:processed.output_key,size:processed.output_size,mime:'audio/mpeg'};\n";
+ const processed="if(processed)asset={...asset,storage_key:processed.output_key,size:processed.output_size,mime:'audio/mpeg'};";
  source=once(source,processed,processed+
-   "  else if(asset?.storage_key?.startsWith('originals/'))fail(503,'S3 recording is awaiting a clean malware scan.');\n",
+   "else if(asset?.storage_key?.startsWith('originals/'))fail(503,'S3 recording is awaiting a clean malware scan.');",
    'require clean scanned S3 playback');
- const art="    const variant=JSON.parse(a!.metadata).normalized_jpeg?null:await mediaStorage.get(artworkJpegKey(a!.id));";
+ const art="const variant=JSON.parse(a!.metadata).normalized_jpeg?null:await mediaStorage.get(artworkJpegKey(a!.id));";
  source=once(source,art,[
    "    if(a!.storage_key.startsWith('originals/')){",
    "     const processed=await one(\"SELECT output_key FROM media_jobs WHERE asset_id=? AND status='complete' AND scan='clean'\",a!.id);",
