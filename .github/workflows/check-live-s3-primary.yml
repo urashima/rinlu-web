@@ -1,0 +1,25 @@
+name: Inspect live canonical S3 primary readiness (read only)
+on:
+  push:
+    branches: [feature/ovh-s3-exclusive-primary]
+    paths:
+      - '.github/workflows/check-live-s3-primary.yml'
+      - 'scripts/verify-canonical-s3-primary.mjs'
+permissions:
+  contents: read
+jobs:
+  site-capability:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Read-only probe (report nonready without mutating production)
+        run: |
+          if node scripts/verify-canonical-s3-primary.mjs; then
+            echo 'Live canonical S3-only capability is READY.'
+          else
+            echo 'Live canonical S3-only capability is NOT ready; preserving R2 production writes.'
+          fi
