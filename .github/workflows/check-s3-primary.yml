@@ -1,0 +1,34 @@
+name: S3-only primary storage contracts and malware processor
+on:
+  pull_request:
+    paths:
+      - 'services/ovh-s3/**'
+      - 'services/media-worker/**'
+      - 'scripts/render-ovh-s3-env.mjs'
+      - '.github/workflows/check-s3-primary.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  primary-safety:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Enforce fail-closed S3 only registration and byte-preserving promotion
+        run: |
+          node --test services/ovh-s3/tests/primary-media.test.mjs services/ovh-s3/tests/s3.test.mjs
+          node --check services/ovh-s3/direct-storage.mjs
+          node --check services/ovh-s3/primary-media.mjs
+      - name: Validate scanner Python and S3 job confinement without production secrets
+        run: |
+          python3 -m py_compile services/media-worker/worker.py services/media-worker/s3_io.py
+          cd services/media-worker
+          python3 -m unittest test_s3_io.py -v
+      - name: Verify safe storage flag handling
+        run: |
+          node --test scripts/tests/render-ovh-s3-env.test.mjs
+          bash -n deploy.sh

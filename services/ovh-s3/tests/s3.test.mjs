@@ -18,6 +18,13 @@ function mock(){
   assert.ok(url.startsWith('https://s3.us-east-va.io.cloud.ovh.us/rinlu-music-prod/'));
   assert.match(h.get('authorization'),/^AWS4-HMAC-SHA256 Credential=TESTACCESS\/[0-9]{8}\/us-east-va\/s3\/aws4_request,/);
   const key=decodeURIComponent(url.slice(url.indexOf('/rinlu-music-prod/')+'/rinlu-music-prod/'.length));
+  if(method==='PUT'&&h.has('x-amz-copy-source')){
+   const source=decodeURIComponent(h.get('x-amz-copy-source').split('/').slice(2).join('/'));
+   const origin=objects.get(source);
+   if(!origin)return new Response(null,{status:404});
+   objects.set(key,{content:Buffer.from(origin.content),mime:h.get('content-type')});
+   return new Response('<CopyObjectResult/>',{status:200,headers:{'content-type':'application/xml'}});
+  }
   if(method==='PUT'){
    assert.equal(h.get('x-amz-content-sha256'),createHash('sha256').update(body).digest('hex'));
    objects.set(key,{content:Buffer.from(body),mime:h.get('content-type')});
@@ -64,6 +71,19 @@ test('verifiedPut stores bytes, validates SHA-256 and avoids duplicate write',as
  const ranged=await s3.get(key,'bytes=1-3');
  assert.equal(ranged.status,206);
  assert.equal(Buffer.from(await ranged.arrayBuffer()).toString(),'EST');
+});
+test('S3-side original promotion never streams bytes through the gateway',async()=>{
+ const fake=mock(),s3=createOvhS3(config,fake.transport);
+ const a='staging/11111111-1111-4111-8111-111111111111/upload.mp3';
+ const b='originals/11111111-1111-4111-8111-111111111111/22222222-2222-4222-8222-222222222222';
+ const bytes=Buffer.from('TESTMP3FULLBYTES');
+ await s3.put(a,bytes,'audio/mpeg');
+ const result=await s3.copy(a,b,'audio/mpeg');
+ assert.equal(result.size,bytes.length);
+ assert.deepEqual(Buffer.from(await (await s3.get(b)).arrayBuffer()),bytes);
+ const copies=fake.requests.filter(x=>x.method==='PUT'&&x.headers.has('x-amz-copy-source'));
+ assert.equal(copies.length,1);
+ assert.equal(copies[0].headers.get('x-amz-copy-source'),'/rinlu-music-prod/'+a);
 });
 test('invalid object key and token-like endpoint are rejected',async()=>{
  const s3=createOvhS3(config,mock().transport);

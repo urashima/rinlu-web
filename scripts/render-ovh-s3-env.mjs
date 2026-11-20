@@ -61,6 +61,7 @@ process.stdout.write([
   'RINLU_S3_PLAYBACK_CACHE=' + (process.env.OVH_S3_PLAYBACK_CACHE === '0' ? '0' : '1'),
   'RINLU_S3_DIRECT_UPLOAD=' + (process.env.OVH_S3_DIRECT_UPLOAD === '0' ? '0' : '1'),
   'RINLU_S3_DIRECT_PLAYBACK=' + (process.env.OVH_S3_DIRECT_PLAYBACK === '0' ? '0' : '1'),
+  'RINLU_S3_PRIMARY_ONLY=' + (process.env.OVH_S3_PRIMARY_ONLY === '1' ? '1' : '0'),
   'RINLU_CDN_ENABLED=' + (cdnEnabled ? '1' : '0'),
   ...(cdnEnabled?Object.entries(cdn).map(([k,v])=>k+'='+v):[]),
   'RINLU_S3_BUCKET=' + bucket,

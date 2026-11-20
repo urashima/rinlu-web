@@ -1,0 +1,21 @@
+name: Audit canonical S3 primary storage dependencies
+on:
+  pull_request:
+    paths:
+      - scripts/audit-primary-storage.mjs
+      - .github/workflows/audit-primary-storage.yml
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: node scripts/prepare-platform.mjs
+        env:
+          RINLU_SOURCE_AUDIT_ONLY: '1'
+      - run: node scripts/audit-primary-storage.mjs

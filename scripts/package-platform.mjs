@@ -27,6 +27,7 @@ const mobileSource=await readFile('services/mobile-gateway/mobile-api.mjs','utf8
 const s3Source=await readFile('services/ovh-s3/s3.mjs','utf8');
 const bridgeSource=await readFile('services/ovh-s3/storage-gateway.mjs','utf8');
 const directSource=await readFile('services/ovh-s3/direct-storage.mjs','utf8');
+const primarySource=await readFile('services/ovh-s3/primary-media.mjs','utf8');
 const signingSource=await readFile('services/ovh-s3/signing.mjs','utf8');
 const cdnSignerSource=await readFile('services/ovh-s3/cdn-signer.mjs','utf8');
 const cdnWorkerSource=await readFile('services/ovh-s3/cdn-worker.mjs','utf8');
@@ -50,6 +51,7 @@ await writeFile(runtime+'/mobile-api.mjs',mobileSource);
 await writeFile(runtime+'/ovh-s3.mjs',s3Source);
 await writeFile(runtime+'/storage-gateway.mjs',bridgeSource);
 await writeFile(runtime+'/direct-storage.mjs',directSource);
+await writeFile(runtime+'/primary-media.mjs',primarySource);
 await writeFile(runtime+'/signing.mjs',signingSource);
 await writeFile(runtime+'/cdn-signer.mjs',cdnSignerSource);
 const dockerPath=runtime+'/Dockerfile',dockerOriginal=await readFile(dockerPath,'utf8');
@@ -58,7 +60,7 @@ if(!dockerOriginal.includes(dockerAnchor)||dockerOriginal.includes('mobile-api.m
   throw Error('Canonical Dockerfile changed; abort production packaging');
 }
 await writeFile(dockerPath,dockerOriginal.replace(dockerAnchor,
-  dockerAnchor+'\nCOPY --chown=node:node mobile-api.mjs ./mobile-api.mjs\nCOPY --chown=node:node ovh-s3.mjs ./ovh-s3.mjs\nCOPY --chown=node:node storage-gateway.mjs ./storage-gateway.mjs\nCOPY --chown=node:node direct-storage.mjs ./direct-storage.mjs\nCOPY --chown=node:node signing.mjs ./signing.mjs\nCOPY --chown=node:node cdn-signer.mjs ./cdn-signer.mjs'));
+  dockerAnchor+'\nCOPY --chown=node:node mobile-api.mjs ./mobile-api.mjs\nCOPY --chown=node:node ovh-s3.mjs ./ovh-s3.mjs\nCOPY --chown=node:node storage-gateway.mjs ./storage-gateway.mjs\nCOPY --chown=node:node direct-storage.mjs ./direct-storage.mjs\nCOPY --chown=node:node primary-media.mjs ./primary-media.mjs\nCOPY --chown=node:node signing.mjs ./signing.mjs\nCOPY --chown=node:node cdn-signer.mjs ./cdn-signer.mjs'));
 const gatewayOverlayHash=createHash('sha256').update(gatewayPatched).digest('hex');
 const enrichedRelease={...release,gateway_overlay_sha256:gatewayOverlayHash,
   gateway_overlay:'rinlu-mobile-api-v1-ovh-s3-v2',
@@ -90,6 +92,7 @@ await writeFile(destination+'/mobile-api-gateway.sha256',
 await writeFile(destination+'/ovh-s3.mjs',s3Source);
 await writeFile(destination+'/storage-gateway.mjs',bridgeSource);
 await writeFile(destination+'/direct-storage.mjs',directSource);
+await writeFile(destination+'/primary-media.mjs',primarySource);
 await writeFile(destination+'/signing.mjs',signingSource);
 await writeFile(destination+'/cdn-signer.mjs',cdnSignerSource);
 await writeFile(destination+'/cdn-worker.mjs',cdnWorkerSource);
@@ -98,6 +101,7 @@ await writeFile(destination+'/browser-direct-overlay.sha256',directOverlayHash+'
 await writeFile(destination+'/ovh-s3.sha256',createHash('sha256').update(s3Source).digest('hex')+'  ovh-s3.mjs\n');
 await writeFile(destination+'/storage-gateway.sha256',createHash('sha256').update(bridgeSource).digest('hex')+'  storage-gateway.mjs\n');
 await writeFile(destination+'/direct-storage.sha256',createHash('sha256').update(directSource).digest('hex')+'  direct-storage.mjs\n');
+await writeFile(destination+'/primary-media.sha256',createHash('sha256').update(primarySource).digest('hex')+'  primary-media.mjs\n');
 await writeFile(destination+'/signing.sha256',createHash('sha256').update(signingSource).digest('hex')+'  signing.mjs\n');
 await writeFile(destination+'/cdn-signer.sha256',createHash('sha256').update(cdnSignerSource).digest('hex')+'  cdn-signer.mjs\n');
 await writeFile(destination+'/cdn-worker.sha256',createHash('sha256').update(cdnWorkerSource).digest('hex')+'  cdn-worker.mjs\n');
