@@ -106,17 +106,17 @@ export function createDirectStorage({s3,backendOrigin,publicOrigin,accountBearer
   if(media.origin!==new URL(backendOrigin).origin||media.pathname!=='/api/media/'+data.track_id||!media.searchParams.has('token'))return send(res,502,{error:'Invalid authorized media response'});
   const bearer=headers(req);
   const test=await upstream(media.pathname+media.search,{method:'HEAD',headers:bearer});
-  if(!test.ok){await test.body?.cancel();return send(res,200,payload);}
+  if(!test.ok){await test.body?.cancel();return send(res,200,{...payload,url:'/music'+payload.url});}
   const total=Number((test.headers.get('content-range')||'').split('/')[1]||test.headers.get('content-length'));
-  if(!Number.isSafeInteger(total)||total<1||total>32*1024*1024)return send(res,200,payload);
+  if(!Number.isSafeInteger(total)||total<1||total>32*1024*1024)return send(res,200,{...payload,url:'/music'+payload.url});
   const detail=await upstream('/api/track/'+data.track_id,{headers:bearer});
-  if(!detail.ok){await detail.body?.cancel();return send(res,200,payload);}
+  if(!detail.ok){await detail.body?.cancel();return send(res,200,{...payload,url:'/music'+payload.url});}
   const record=(await detail.json()).track;
-  if(!Number.isSafeInteger(record?.version)||record.version<1)return send(res,200,payload);
+  if(!Number.isSafeInteger(record?.version)||record.version<1)return send(res,200,{...payload,url:'/music'+payload.url});
   const key='playback/'+data.track_id+'/v'+record.version+'-s'+total+'.mp3';
   let meta;
-  try{meta=await s3.head(key);}catch{return send(res,200,payload);}
-  if(meta?.size!==total)return send(res,200,payload);
+  try{meta=await s3.head(key);}catch{return send(res,200,{...payload,url:'/music'+payload.url});}
+  if(meta?.size!==total)return send(res,200,{...payload,url:'/music'+payload.url});
   const signed=signer.signedGet(key,900);
   return send(res,200,{...payload,probe_url:'/music'+payload.url,source_url:payload.url,url:signed,delivery:'ovh-s3-direct',expires_at:Date.now()+900000});
  }
