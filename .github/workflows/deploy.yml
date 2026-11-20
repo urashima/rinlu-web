@@ -254,26 +254,6 @@ jobs:
           print('PUBLIC HTTPS VALIDATION PASSED: bilingual privacy and footers')
           PY
 
-      - name: Verify public social preview image and static crawler tags
-        if: steps.platform.outputs.changed == 'true'
-        run: |
-          set -euo pipefail
-          curl --fail --retry 5 --retry-delay 3 -L https://rinlu.com/music/ -o /tmp/rinlu-share-page.html
-          curl --fail --retry 5 --retry-delay 3 -L https://rinlu.com/music/share/rinlu-neon.jpg -o /tmp/rinlu-share-image.jpg
-          python3 - <<'PY'
-          import hashlib
-          from pathlib import Path
-          html=Path('/tmp/rinlu-share-page.html').read_text()
-          preview=Path('/tmp/rinlu-share-image.jpg').read_bytes()
-          url='https://rinlu.com/music/share/rinlu-neon.jpg'
-          assert '<meta property="og:image" content="'+url+'">' in html, 'OG image missing'
-          assert '<meta name="twitter:image" content="'+url+'">' in html, 'Twitter preview missing'
-          assert '<meta property="og:image:width" content="480">' in html, 'Image width missing'
-          expected='7e70e193abb5732dafe68fc889b9ea9b0d823fb2fc97c8c7a72ed3015275b464'
-          assert hashlib.sha256(preview).hexdigest()==expected, 'Live social image differs from approved file'
-          print('PUBLIC SOCIAL PREVIEW VERIFIED: original design, 480×480 optimized JPEG')
-          PY
-
       - name: Verify embedded Highway and shared catalog chart
         if: steps.platform.outputs.changed == 'true'
         run: |

@@ -8,9 +8,7 @@ const origin='https://sonora-independent-music.kai-ma.chatgpt.site';
 const manifest=await fetch(origin+'/source/manifest.json?release='+Date.now()).then(r=>{if(!r.ok)throw Error('Release manifest unavailable');return r.json()});
 if(!/^[a-f0-9]{64}$/.test(manifest.sha256)||manifest.url!=='/source/rinlu-player-source.tar.gz')throw Error('Invalid release manifest');
 let current;try{current=await fetch('https://rinlu.com/music/_release.json',{signal:AbortSignal.timeout(10000)}).then(r=>r.ok?r.json():null)}catch{}
-const previewBase64=(await Promise.all(Array.from({length:6},(_,i)=>readFile(`scripts/social-preview/part${i+1}.txt`,'utf8')))).map(x=>x.trim()).join('');
-const previewSha256=createHash('sha256').update(Buffer.from(previewBase64,'base64')).digest('hex');
-if(process.env.GITHUB_EVENT_NAME==='schedule'&&current?.source_sha256===manifest.sha256&&current?.social_preview_sha256===previewSha256){await writeFile(process.env.GITHUB_OUTPUT,'changed=false\n',{flag:'a'});console.log('Both sites already share release and social preview',manifest.sha256,previewSha256);process.exit(0)}
+if(process.env.GITHUB_EVENT_NAME==='schedule'&&current?.source_sha256===manifest.sha256){await writeFile(process.env.GITHUB_OUTPUT,'changed=false\n',{flag:'a'});console.log('Both sites already share release',manifest.sha256);process.exit(0)}
 await mkdir('.platform-source',{recursive:true});const archive=Buffer.from(await fetch(origin+manifest.url+'?sha='+manifest.sha256).then(r=>{if(!r.ok)throw Error('Source unavailable');return r.arrayBuffer()}));
 if(archive.length!==manifest.bytes||createHash('sha256').update(archive).digest('hex')!==manifest.sha256)throw Error('Archive checksum mismatch');
 await writeFile('.platform-source/release.tar.gz',archive);
