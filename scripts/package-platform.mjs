@@ -19,6 +19,8 @@ await cp(source + '/platform-dist', runtime + '/public', {recursive: true});
 
 // OVH-only read-only mobile API: the canonical Sites/D1 source remains untouched.
 // The gateway's additional corresponding source is published separately.
+const brandSource=await readFile('scripts/apply-platform-brand.mjs','utf8');
+const brandOverlayHash=createHash('sha256').update(brandSource).digest('hex');
 const mobileSource=await readFile('services/mobile-gateway/mobile-api.mjs','utf8');
 const gatewayPath=runtime+'/server.mjs', gatewayOriginal=await readFile(gatewayPath,'utf8');
 const gatewayImport="import {pathToFileURL} from 'node:url';";
@@ -44,7 +46,9 @@ await writeFile(dockerPath,dockerOriginal.replace(dockerAnchor,
   dockerAnchor+'\nCOPY --chown=node:node mobile-api.mjs ./mobile-api.mjs'));
 const gatewayOverlayHash=createHash('sha256').update(gatewayPatched).digest('hex');
 const enrichedRelease={...release,gateway_overlay_sha256:gatewayOverlayHash,
-  gateway_overlay:'rinlu-mobile-api-v1'};
+  gateway_overlay:'rinlu-mobile-api-v1',
+  brand_overlay_sha256:brandOverlayHash,
+  brand_overlay:'madimi-one-wordmark-v1'};
 await writeFile(runtime+'/public/_release.json',JSON.stringify(enrichedRelease)+'\n');
 
 
@@ -61,6 +65,8 @@ await writeFile(indexPath, indexHtml.replace('</body>', '<script defer src="/mus
 const destination = runtime + '/public/source';
 await mkdir(destination, {recursive: true});
 await cp(archivePath, destination + '/rinlu-player-source.tar.gz');
+await writeFile(destination+'/brand-wordmark-overlay.mjs',brandSource);
+await writeFile(destination+'/brand-wordmark-overlay.sha256',brandOverlayHash+'  brand-wordmark-overlay.mjs\n');
 await writeFile(destination+'/mobile-api-gateway.mjs',mobileSource);
 await writeFile(destination+'/mobile-api-gateway.sha256',
   createHash('sha256').update(mobileSource).digest('hex')+'  mobile-api-gateway.mjs\n');

@@ -24,6 +24,10 @@ jobs:
           node --test services/mobile-gateway/mobile-api.test.mjs
       - name: Verify current canonical source
         run: node scripts/prepare-platform.mjs
+      - name: Validate Madimi One lowercase wordmarks against verified source
+        run: |
+          node --check scripts/apply-platform-brand.mjs
+          node --test scripts/test-platform-brand.mjs
       - name: Build website and package with gateway overlay
         run: |
           set -euo pipefail
