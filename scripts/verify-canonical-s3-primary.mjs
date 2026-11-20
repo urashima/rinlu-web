@@ -8,7 +8,7 @@ const targets=[
 for(const [name,url] of targets){
  try{
   const result=await fetch(url,{
-   method:'GET',headers:{'Accept':'application/json'},
+   method:'GET',headers:{'Accept':'application/json',...(process.env.RINLU_SITES_ACCESS_TOKEN?{'OAI-Sites-Authorization':'Bearer '+process.env.RINLU_SITES_ACCESS_TOKEN}:{})},
    redirect:'manual',signal:AbortSignal.timeout(20000)
   });
   const type=result.headers.get('content-type')||'';
