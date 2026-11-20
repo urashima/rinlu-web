@@ -94,7 +94,7 @@ export async function s3PrimaryRoute(req:Request,p:string[],u:Row|null):Promise<
  const bytes=new Uint8Array(await object.arrayBuffer());
  if(bytes.byteLength!==b.size)fail(409,'S3 file size changed during registration.');
  if(b.kind==='audio'){
-   try{inspectMp3(bytes,true)}catch{fail(415,'Upload an MP3 encoded at 192 kbps or 320 kbps.');}
+   try{inspectMp3(bytes,true)}catch{fail(415,'Upload an MP3 with an average audio bitrate of at least 192 kbps (CBR or VBR).');}
  }else if(!isArtworkJpeg(bytes))fail(415,'Choose a supported JPG cover.');
  const digest=await mediaDigest(bytes);
  const time=now();
