@@ -19,7 +19,7 @@ export function createOvhS3(env=process.env,transport=fetch) {
   if(endpoint.protocol!=='https:'||endpoint.host!==host||endpoint.pathname!=='/'||endpoint.search||endpoint.hash||endpoint.username||endpoint.password)throw Error('Unexpected S3 endpoint');
   if(!access||!secret||/[\r\n\0]/.test(access+secret))throw Error('Invalid S3 credentials');
 
-  async function request(method,key,{body,contentType,range,timeout=45000}={}) {
+  async function request(method,key,{body,contentType,range,copySource,timeout=45000}={}) {
     if(!/^[A-Za-z0-9/_\-.]{1,450}$/.test(key)||key.split('/').includes('..'))throw Error('Invalid object key');
     const path='/'+percent(bucket)+'/'+keyPath(key),date=new Date().toISOString().replace(/[:-]|\.\d{3}/g,''),short=date.slice(0,8);
     const payload=digest(body||Buffer.alloc(0)),headers=new Headers({
@@ -28,6 +28,11 @@ export function createOvhS3(env=process.env,transport=fetch) {
     if(contentType)headers.set('content-type',contentType);
     if(body)headers.set('content-length',String(body.byteLength));
     if(range)headers.set('range',range);
+    if(copySource){
+      if(!/^[A-Za-z0-9/_\-.]{1,450}$/.test(copySource)||copySource.split('/').includes('..'))throw Error('Invalid source object key');
+      headers.set('x-amz-copy-source','/'+percent(bucket)+'/'+keyPath(copySource));
+      headers.set('x-amz-metadata-directive','REPLACE');
+    }
     const sorted=[...headers].sort(([a],[b])=>a.localeCompare(b)),signed=sorted.map(([k])=>k).join(';');
     const canonical=[method,path,'',sorted.map(([k,v])=>k+':'+v.trim()+'\n').join(''),signed,payload].join('\n');
     const scope=short+'/'+region+'/s3/aws4_request';
@@ -49,6 +54,12 @@ export function createOvhS3(env=process.env,transport=fetch) {
       if(!r.ok)throw Error('OVH S3 object write failed');
       await r.body?.cancel();
       return {bytes:body.length,sha256:digest(body)};
+    },
+    async copy(from,to,contentType='application/octet-stream'){
+      const r=await request('PUT',to,{copySource:from,contentType});
+      if(!r.ok)throw Error('OVH S3 server-side object copy failed');
+      await r.body?.cancel();
+      return this.head(to);
     },
     async head(key){
       const r=await request('HEAD',key);
