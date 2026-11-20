@@ -21,6 +21,8 @@ jobs:
         run: node scripts/prepare-platform.mjs
       - name: Apply full S3-only canonical Worker patch with exact anchor validation
         run: node scripts/apply-canonical-s3-primary.mjs
+      - name: Verify S3 primary canonical MP3 accepts CBR and VBR >=192
+        run: node scripts/test-canonical-mp3-policy.mjs
       - name: Install canonical TypeScript compiler from exact source lockfile
         run: |
           npm install --global pnpm@11.25.0
