@@ -1,0 +1,19 @@
+name: RINLU canonical backend primary source inspection
+on:
+  pull_request:
+    paths:
+      - 'scripts/inspect-canonical-primary.mjs'
+      - '.github/workflows/inspect-canonical-primary.yml'
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: node scripts/prepare-platform.mjs
+      - run: node scripts/inspect-canonical-primary.mjs
