@@ -25,7 +25,23 @@ if [[ -f "$google_env" && ! -L "$google_env" ]]; then
  rm -f "$google_env"
 fi
 [[ -s /etc/rinlu/google.env ]]
-start_platform(){ docker run -d --name rinlu-platform --network rinlu-music --restart unless-stopped --read-only --tmpfs /tmp:size=16m --memory 256m --cpus 1 --pids-limit 100 --cap-drop ALL --security-opt no-new-privileges --env-file /etc/rinlu/google.env -e NODE_ENV=production "$1" >/dev/null; }
+# Optional OVH S3 credentials are staged over SSH by GitHub Actions, never in git.
+# Keep the previously deployed secret when a release doesn't provide new credentials.
+staged_storage=/home/ubuntu/rinlu-storage.env
+if [[ -e "$staged_storage" || -L "$staged_storage" ]]; then
+  [[ -f "$staged_storage" && ! -L "$staged_storage" ]] || { echo 'Unsafe staged storage file.' >&2; exit 2; }
+  [[ $(stat -c %a "$staged_storage") == 600 ]] || { echo 'Staged storage credentials must be mode 600.' >&2; exit 2; }
+  install -o root -g root -m 600 "$staged_storage" /etc/rinlu/storage.env.new
+  mv -f /etc/rinlu/storage.env.new /etc/rinlu/storage.env
+  rm -f "$staged_storage"
+fi
+storage_flags=()
+if [[ -e /etc/rinlu/storage.env || -L /etc/rinlu/storage.env ]]; then
+  [[ -f /etc/rinlu/storage.env && ! -L /etc/rinlu/storage.env && -s /etc/rinlu/storage.env ]] || { echo 'Invalid root storage credential file.' >&2; exit 2; }
+  [[ $(stat -c %u /etc/rinlu/storage.env) == 0 && $(stat -c %a /etc/rinlu/storage.env) == 600 ]] || { echo 'Storage file must be root-owned with mode 600.' >&2; exit 2; }
+  storage_flags=(--env-file /etc/rinlu/storage.env)
+fi
+start_platform(){ docker run -d --name rinlu-platform --network rinlu-music --restart unless-stopped --read-only --tmpfs /tmp:size=16m --memory 256m --cpus 1 --pids-limit 100 --cap-drop ALL --security-opt no-new-privileges --env-file /etc/rinlu/google.env "${storage_flags[@]}" -e NODE_ENV=production "$1" >/dev/null; }
 start_charts(){ docker run -d --name rinlu-charts --network rinlu-music --restart unless-stopped --read-only --tmpfs /tmp:size=768m,mode=1777 --memory 1536m --cpus 0.75 --cpu-shares 128 --pids-limit 100 --cap-drop ALL --security-opt no-new-privileges -e NODE_ENV=production "$1" >/dev/null; }
 start_web(){ docker run -d --name rinlu-web --network rinlu-music --restart unless-stopped --memory 256m --cpus 0.5 --security-opt no-new-privileges -p 0.0.0.0:80:80 "$1" >/dev/null; }
 rollback(){
