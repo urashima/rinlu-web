@@ -22,6 +22,8 @@ await cp(source + '/platform-dist', runtime + '/public', {recursive: true});
 const brandSource=await readFile('scripts/apply-platform-brand.mjs','utf8');
 const brandOverlayHash=createHash('sha256').update(brandSource).digest('hex');
 const mobileSource=await readFile('services/mobile-gateway/mobile-api.mjs','utf8');
+const s3Source=await readFile('services/ovh-s3/s3.mjs','utf8');
+const bridgeSource=await readFile('services/ovh-s3/storage-gateway.mjs','utf8');
 const gatewayPath=runtime+'/server.mjs', gatewayOriginal=await readFile(gatewayPath,'utf8');
 const gatewayImport="import {pathToFileURL} from 'node:url';";
 const gatewayServer=" return http.createServer(async(req,res)=>";
@@ -31,22 +33,24 @@ if(!gatewayOriginal.includes(gatewayImport)||!gatewayOriginal.includes(gatewaySe
   throw Error('Canonical gateway changed; abort production packaging and reconcile overlay');
 }
 const gatewayPatched=gatewayOriginal
-  .replace(gatewayImport,gatewayImport+"\nimport {createMobileApiHandler} from './mobile-api.mjs';")
-  .replace(gatewayServer," const mobileApi=createMobileApiHandler({backendOrigin});\n"+gatewayServer)
+  .replace(gatewayImport,gatewayImport+"\nimport {createMobileApiHandler} from './mobile-api.mjs';\nimport {createOvhS3} from './ovh-s3.mjs';\nimport {createStorageGateway} from './storage-gateway.mjs';")
+  .replace(gatewayServer," const mobileApi=createMobileApiHandler({backendOrigin});\n const s3Bridge=createStorageGateway({s3:createOvhS3(process.env),backendOrigin,publicOrigin,accountBearer});\n"+gatewayServer)
   .replace(gatewayProxy,
-    "  if(local.startsWith('/api/mobile/v1/'))return await mobileApi(req,res,url,accountBearer(req),send);\n"+gatewayProxy);
+    "  if(local.startsWith('/api/mobile/v1/'))return await mobileApi(req,res,url,accountBearer(req),send);\n  if(local.startsWith('/api/')){if(s3Bridge&&await s3Bridge.handle(req,res,local,url))return;return await proxy(req,res,local+url.search);}" );
 await writeFile(gatewayPath,gatewayPatched);
 await writeFile(runtime+'/mobile-api.mjs',mobileSource);
+await writeFile(runtime+'/ovh-s3.mjs',s3Source);
+await writeFile(runtime+'/storage-gateway.mjs',bridgeSource);
 const dockerPath=runtime+'/Dockerfile',dockerOriginal=await readFile(dockerPath,'utf8');
 const dockerAnchor='COPY --chown=node:node server.mjs ./server.mjs';
-if(!dockerOriginal.includes(dockerAnchor)||dockerOriginal.includes('mobile-api.mjs')) {
+if(!dockerOriginal.includes(dockerAnchor)||dockerOriginal.includes('mobile-api.mjs')||dockerOriginal.includes('ovh-s3.mjs')) {
   throw Error('Canonical Dockerfile changed; abort production packaging');
 }
 await writeFile(dockerPath,dockerOriginal.replace(dockerAnchor,
-  dockerAnchor+'\nCOPY --chown=node:node mobile-api.mjs ./mobile-api.mjs'));
+  dockerAnchor+'\nCOPY --chown=node:node mobile-api.mjs ./mobile-api.mjs\nCOPY --chown=node:node ovh-s3.mjs ./ovh-s3.mjs\nCOPY --chown=node:node storage-gateway.mjs ./storage-gateway.mjs'));
 const gatewayOverlayHash=createHash('sha256').update(gatewayPatched).digest('hex');
 const enrichedRelease={...release,gateway_overlay_sha256:gatewayOverlayHash,
-  gateway_overlay:'rinlu-mobile-api-v1',
+  gateway_overlay:'rinlu-mobile-api-v1-ovh-s3-v1',
   brand_overlay_sha256:brandOverlayHash,
   brand_overlay:'madimi-one-wordmark-v1'};
 await writeFile(runtime+'/public/_release.json',JSON.stringify(enrichedRelease)+'\n');
@@ -70,6 +74,10 @@ await writeFile(destination+'/brand-wordmark-overlay.sha256',brandOverlayHash+' 
 await writeFile(destination+'/mobile-api-gateway.mjs',mobileSource);
 await writeFile(destination+'/mobile-api-gateway.sha256',
   createHash('sha256').update(mobileSource).digest('hex')+'  mobile-api-gateway.mjs\n');
+await writeFile(destination+'/ovh-s3.mjs',s3Source);
+await writeFile(destination+'/storage-gateway.mjs',bridgeSource);
+await writeFile(destination+'/ovh-s3.sha256',createHash('sha256').update(s3Source).digest('hex')+'  ovh-s3.mjs\n');
+await writeFile(destination+'/storage-gateway.sha256',createHash('sha256').update(bridgeSource).digest('hex')+'  storage-gateway.mjs\n');
 await writeFile(destination + '/manifest.json', JSON.stringify({
   release: release.release,
   sha256: release.source_sha256,
