@@ -1,0 +1,21 @@
+name: Gate UI release on live canonical RINLU audio policy
+on:
+  push:
+    branches: [feature/admin-live-audio-format-policy]
+    paths:
+      - 'scripts/verify-live-upload-policy.mjs'
+      - '.github/workflows/verify-live-upload-policy.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  policy-live:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Verify original D1 backend and OVH gateway show MP3 128kbps policy
+        run: node scripts/verify-live-upload-policy.mjs
