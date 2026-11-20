@@ -78,6 +78,36 @@ if (indexHtml.includes('privacy-footer.js')) throw new Error('Duplicate privacy 
 await cp('scripts/privacy-footer.js', runtime + '/public/privacy-footer.js');
 await writeFile(indexPath, indexHtml.replace('</body>', '<script defer src="/music/privacy-footer.js"></script>\n</body>'));
 
+// Static, versioned social preview. Uses a lightweight JPEG rendition of the user's supplied image.
+const encodedParts=[];
+for(let i=1;i<=6;i++)encodedParts.push((await readFile('scripts/social-preview/part'+i+'.txt','utf8')).trim());
+const previewBinary=Buffer.from(encodedParts.join(''),'base64');
+const expectedPreviewSha='7e70e193abb5732dafe68fc889b9ea9b0d823fb2fc97c8c7a72ed3015275b464';
+if(createHash('sha256').update(previewBinary).digest('hex')!==expectedPreviewSha)
+ throw Error('RINLU social preview image checksum mismatch');
+await mkdir(runtime+'/public/share',{recursive:true});
+await writeFile(runtime+'/public/share/rinlu-neon.jpg',previewBinary);
+let socialHtml=await readFile(indexPath,'utf8');
+if(!socialHtml.includes('</head>'))throw Error('Built platform HTML missing head');
+socialHtml=socialHtml.replace(/<meta\s+[^>]*(?:property|name)\s*=\s*["'](?:og:image(?::[^"']*)?|twitter:image)["'][^>]*>/gi,'');
+const socialTags=[
+ '<meta property="og:type" content="website">',
+ '<meta property="og:site_name" content="RINLU">',
+ '<meta property="og:url" content="https://rinlu.com/music/">',
+ '<meta property="og:title" content="RINLU — music • play • create">',
+ '<meta property="og:description" content="Discover original music, play rhythm games and create on RINLU.">',
+ '<meta property="og:image" content="https://rinlu.com/music/share/rinlu-neon.jpg">',
+ '<meta property="og:image:secure_url" content="https://rinlu.com/music/share/rinlu-neon.jpg">',
+ '<meta property="og:image:type" content="image/jpeg">',
+ '<meta property="og:image:width" content="480">',
+ '<meta property="og:image:height" content="480">',
+ '<meta property="og:image:alt" content="RINLU — music, play and create">',
+ '<meta name="twitter:card" content="summary_large_image">',
+ '<meta name="twitter:image" content="https://rinlu.com/music/share/rinlu-neon.jpg">'
+].join('\n');
+await writeFile(indexPath,socialHtml.replace('</head>',socialTags+'\n</head>'));
+
+
 
 const destination = runtime + '/public/source';
 await mkdir(destination, {recursive: true});
