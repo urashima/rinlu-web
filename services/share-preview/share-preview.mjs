@@ -80,24 +80,6 @@ export function createSharePreview({s3,backendOrigin,publicOrigin,accountBearer,
   cache=value;cacheUntil=Date.now()+20_000;
   return json(res,200,{enabled:false,imageUrl:null});
  }
- function adminPage(){
-  return `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>分享图 — RINLU</title><style>
-  :root{color-scheme:dark;font-family:system-ui,-apple-system,sans-serif}*{box-sizing:border-box}
-  body{background:#0d111e;color:#fff;margin:0}main{max-width:720px;margin:8vh auto;padding:0 20px}
-  a{color:#a7bcff}h1{margin-top:36px}p{color:#aeb8d0;line-height:1.7}
-  section{background:#171d2b;border:1px solid #353e57;border-radius:16px;padding:24px}
-  img{display:block;width:min(320px,100%);aspect-ratio:1;object-fit:contain;margin:18px 0;border-radius:12px;background:#0c1020}
-  img[hidden]{display:none}input{display:block;max-width:100%;margin:20px 0}
-  button{border:0;border-radius:9px;background:#9fb3ff;color:#091124;padding:10px 18px;margin:0 8px 0 0;font-weight:700;cursor:pointer}
-  button:disabled{opacity:.5;cursor:default}#clear{background:#47303a;color:#ffbdc7}#status{min-height:25px}small{color:#8390ad}
-  </style></head><body><main><a href="/music/admin">← 返回管理后台</a><h1>分享图</h1>
-  <p>首次不配置任何图片。保存后立即更新 RINLU 首页的分享预览，无须重新构建或部署。</p>
-  <section><strong>当前图片</strong><img id="preview" alt="分享图预览" hidden><p id="empty">未配置</p>
-  <input id="file" type="file" accept="image/jpeg,image/png,image/webp">
-  <button id="save" disabled>保存分享图</button><button id="clear" disabled>清除配置</button>
-  <p id="status" role="status"></p><small>JPEG / PNG / WebP，最大 4 MB。社交平台的旧分享预览可能存在缓存。</small>
-  </section></main><script defer src="/music/share-admin.js"></script></body></html>`;
- }
  async function image(req,res,url){
   if(!s3){res.writeHead(404);res.end();return;}
   const current=(await config()).image;
@@ -122,17 +104,15 @@ export function createSharePreview({s3,backendOrigin,publicOrigin,accountBearer,
    try{await image(req,res,url);}catch(e){console.error('Share image:',e?.message);if(!res.headersSent){res.writeHead(503);res.end();}else res.destroy();}
    return true;
   }
-  if(path==='/music/admin/share-image'||path==='/music/api/admin/share-image'){
-   if(!['GET','HEAD','POST','DELETE'].includes(req.method)) {json(res,405,{error:'Method not allowed'});return true;}
-   if(path==='/music/admin/share-image'&&!['GET','HEAD'].includes(req.method)){json(res,405,{error:'Method not allowed'});return true;}
-   if(path==='/music/api/admin/share-image'&&req.method==='HEAD'){json(res,405,{error:'Method not allowed'});return true;}
+  if(path==='/music/admin/share-image'){
+   if(!['GET','HEAD'].includes(req.method)){json(res,405,{error:'Method not allowed'});return true;}
+   res.writeHead(302,{'Location':'/music/admin/site-fonts','Cache-Control':'no-store'});
+   res.end();return true;
+  }
+  if(path==='/music/api/admin/share-image'){
+   if(!['GET','POST','DELETE'].includes(req.method)){json(res,405,{error:'Method not allowed'});return true;}
    let authorized;try{authorized=await requireAdmin(req);}catch(e){console.error('Share admin auth:',e?.message);json(res,503,{error:'Authentication unavailable'});return true;}
    if(authorized!==200){json(res,authorized,{error:'Administrator required'});return true;}
-   if(path==='/music/admin/share-image'){
-    res.writeHead(200,{'Content-Type':'text/html; charset=utf-8','Cache-Control':'private, no-store',
-     'Content-Security-Policy':"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob:; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'"});
-    res.end(req.method==='HEAD'?undefined:adminPage());return true;
-   }
    if(!s3){json(res,503,{error:'OVH S3 is not configured'});return true;}
    try{
     if(req.method==='GET'){
