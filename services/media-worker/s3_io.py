@@ -44,7 +44,7 @@ class Storage:
         self.clock=clock or (lambda:datetime.datetime.now(datetime.timezone.utc))
 
     def _signed(self,method,key,body=None,content_type=None):
-        kind='original' if method=='GET' else 'rendition'
+        kind='rendition' if method=='PUT' or RENDITION.fullmatch(key or '') else 'original'
         validate_key(key,kind)
         path='/'+quote(self.bucket,safe='')+'/'+('/'.join(quote(c,safe='') for c in key.split('/')))
         stamp=self.clock().strftime('%Y%m%dT%H%M%SZ')
@@ -67,9 +67,9 @@ class Storage:
         return urllib.request.Request(self.endpoint.rstrip('/')+path,data=body if method=='PUT' else None,
           headers=headers,method=method)
 
-    def read(self,key,destination,limit=MAX_SOURCE):
-        validate_key(key,'original')
-        if not 0<limit<=MAX_RENDITION:raise ValueError('Untrusted original size limit')
+    def read(self,key,destination,limit=MAX_SOURCE,kind='original'):
+        validate_key(key,kind)
+        if not 0<limit<=MAX_RENDITION:raise ValueError('Untrusted S3 file size limit')
         obj=self._signed('GET',key)
         total=0;sha=hashlib.sha256()
         with self.opener.open(obj,timeout=240) as response,open(destination,'wb') as out:
