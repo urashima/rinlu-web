@@ -38,15 +38,14 @@ export async function applyPlatformBrand(root){
  if(css.includes('RINLU-MADIMI-WORDMARK'))throw Error('Wordmark overlay already applied');
  // Only brand-wordmark elements receive the display font; other text retains
  // the canonical platform's chosen typographic system.
- css="@import url('https://fonts.googleapis.com/css2?family=Madimi+One&display=swap');\n"+css+\u0060
-/* RINLU-MADIMI-WORDMARK — branding only, desktop/mobile/auth */
-.brand-name, .mobile-wordmark, .access-wordmark {
-  font-family: 'Madimi One', sans-serif !important;
-  font-weight: 400 !important;
-  letter-spacing: -.035em !important;
-  text-transform: none !important;
-}
-\u0060;
+ css="@import url('https://fonts.googleapis.com/css2?family=Madimi+One&display=swap');\n"+css+
+  '\n/* RINLU-MADIMI-WORDMARK — branding only, desktop/mobile/auth */\n'+
+  '.brand-name, .mobile-wordmark, .access-wordmark {\n'+
+  "  font-family: 'Madimi One', sans-serif !important;\n"+
+  '  font-weight: 400 !important;\n'+
+  '  letter-spacing: -.035em !important;\n'+
+  '  text-transform: none !important;\n'+
+  '}\n';
  await writeFile(path,css);
  console.log('RINLU brand overlay applied:',wordmarks,'lowercase wordmarks + Madimi One font');
 }
