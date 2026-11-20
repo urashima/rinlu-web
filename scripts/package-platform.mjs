@@ -46,7 +46,7 @@ const gatewayPatched=gatewayOriginal
     "  if(local.startsWith('/api/mobile/v1/'))return await mobileApi(req,res,url,accountBearer(req),send);\n  if(local.startsWith('/api/')){if(s3Bridge&&await s3Bridge.handle(req,res,local,url))return;return await proxy(req,res,local+url.search);}" )
   .replace(gatewayMediaHeaders,gatewayMediaHeaders+"\n   if(path.startsWith('/api/media/')&&response.headers.has('content-length'))res.setHeader('Content-Length',response.headers.get('content-length'));");
 // The sharing extension is independent of the canonical platform archive.
-const shareStart=/ return http\\.createServer\\(async\\(req,res\\)=>\\s*\\{/;
+const shareStart=/ return http\.createServer\(async\(req,res\)=>\s*\{/;
 if(!shareStart.test(gatewayPatched))throw Error('Canonical request handler changed; share extension not applied');
 const shareGateway=gatewayPatched
  .replace(gatewayImport,gatewayImport+"\nimport {createSharePreview} from './share-preview.mjs';")
