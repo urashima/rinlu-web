@@ -28,15 +28,17 @@ const gatewayPath=runtime+'/server.mjs', gatewayOriginal=await readFile(gatewayP
 const gatewayImport="import {pathToFileURL} from 'node:url';";
 const gatewayServer=" return http.createServer(async(req,res)=>";
 const gatewayProxy="  if(local.startsWith('/api/'))return await proxy(req,res,local+url.search);";
+const gatewayMediaHeaders="   for(const name of ['content-type','content-range','accept-ranges','etag','last-modified','content-disposition'])";
 if(!gatewayOriginal.includes(gatewayImport)||!gatewayOriginal.includes(gatewayServer)||
-   !gatewayOriginal.includes(gatewayProxy)||gatewayOriginal.includes('createMobileApiHandler')) {
+   !gatewayOriginal.includes(gatewayProxy)||!gatewayOriginal.includes(gatewayMediaHeaders)||gatewayOriginal.includes('createMobileApiHandler')) {
   throw Error('Canonical gateway changed; abort production packaging and reconcile overlay');
 }
 const gatewayPatched=gatewayOriginal
   .replace(gatewayImport,gatewayImport+"\nimport {createMobileApiHandler} from './mobile-api.mjs';\nimport {createOvhS3} from './ovh-s3.mjs';\nimport {createStorageGateway} from './storage-gateway.mjs';")
   .replace(gatewayServer," const mobileApi=createMobileApiHandler({backendOrigin});\n const s3Bridge=createStorageGateway({s3:createOvhS3(process.env),backendOrigin,publicOrigin,accountBearer});\n"+gatewayServer)
   .replace(gatewayProxy,
-    "  if(local.startsWith('/api/mobile/v1/'))return await mobileApi(req,res,url,accountBearer(req),send);\n  if(local.startsWith('/api/')){if(s3Bridge&&await s3Bridge.handle(req,res,local,url))return;return await proxy(req,res,local+url.search);}" );
+    "  if(local.startsWith('/api/mobile/v1/'))return await mobileApi(req,res,url,accountBearer(req),send);\n  if(local.startsWith('/api/')){if(s3Bridge&&await s3Bridge.handle(req,res,local,url))return;return await proxy(req,res,local+url.search);}" )
+  .replace(gatewayMediaHeaders,gatewayMediaHeaders+"\\n   if(path.startsWith('/api/media/')&&response.headers.has('content-length'))res.setHeader('Content-Length',response.headers.get('content-length'));");
 await writeFile(gatewayPath,gatewayPatched);
 await writeFile(runtime+'/mobile-api.mjs',mobileSource);
 await writeFile(runtime+'/ovh-s3.mjs',s3Source);
