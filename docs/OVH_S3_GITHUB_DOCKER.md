@@ -1,6 +1,6 @@
 # RINLU OVH S3: GitHub Secrets to Docker
 
-This change delivers OVH S3 connection credentials to the existing RINLU platform Docker container, without committing keys or changing website/VPN ports. It does **not** yet implement S3 upload, playback or migration in the canonical RINLU application.
+OVH S3 credentials are securely delivered from GitHub to RINLU Docker. A read-through S3 bridge now mirrors uploads and stores authorized playback renditions, while preserving canonical R2 media as an explicit fallback. The D1 database and moderation remain unchanged.
 
 ## GitHub configuration
 
@@ -45,3 +45,22 @@ Expected ownership/mode: 600 root:root. Seeing Docker variables does not imply t
 ## Key rotation and rollback
 
 Update GitHub Secrets then manually run the deployment workflow again. Never expose the keys through Docker inspect, printenv, log output, screenshots, or chat. Use a dedicated OVH bucket-scoped access user and short-lived signed upload/playback URLs when implementing the application data plane.
+
+
+## Actual audio/object storage integration
+
+- New uploads from rinlu.com/music: the canonical backend validates and stores each original MP3/JPG in R2. The OVH gateway validates the returned asset ID, authenticated owner, file size and SHA-256, then writes the same bytes to private OVH S3 under the owner/asset key. It reads back and verifies S3 before responding. Retrying a file is idempotent.
+- Playback: only after the canonical backend validates a signed playback URL with HEAD, the gateway checks the current track version and byte length and serves its OVH S3 copy if present. Missing copies transparently fall back to R2 and are scheduled for S3 caching.
+- Historical approved public recordings: the separate Backfill OVH S3 GitHub Action first verifies a reversible private S3 write/read/delete, then migrates accessible published playbacks, checking each S3 object byte-for-byte before considering it complete. It cannot legitimately access private/unreleased originals.
+- No original media files are deleted. This is S3-first read-through mirroring, not a destructive full primary storage cutover. Artist, track, playlist, lyric, rights and moderation IDs remain unchanged.
+- Object Storage stays private. In this release, music bytes still pass through the same-origin RINLU Docker gateway after S3 reads. Browser CORS or anonymous bucket access is not necessary; presigned direct-client delivery and CDN are separate future optimizations.
+
+## Activation and safe rollback
+
+Both new features default to enabled when the GitHub Actions production build has passed a real private S3 read/write/checksum/delete probe. Optional GitHub Repository Variables OVH_S3_UPLOAD_MIRROR=0 or OVH_S3_PLAYBACK_CACHE=0 disable the corresponding feature at the next successful deployment. A failed S3 smoke test aborts the deployment without replacing the running website.
+
+A successful new artist file POST will include the header X-Rinlu-Storage: ovh-s3-mirrored; a signed playback fulfilled from S3 includes X-Rinlu-Storage: ovh-s3. The first playback of a missing object may use R2 while the cache is warming. Never print real keys, session cookies, signed playback tokens or user media into CI logs.
+
+## Scope boundary
+
+The canonical ChatGPT Sites / Cloudflare Worker still owns the original D1/R2 business database and original media source files. GH Secrets injected into OVH Docker do not configure those independent Worker bindings. Moving private original files and changing canonical Worker primary writes to S3 needs a separately validated source-side rollout. The Worker's existing experimental S3 adapter also requires correcting its endpoint rule for OVH US (.ovh.us).
