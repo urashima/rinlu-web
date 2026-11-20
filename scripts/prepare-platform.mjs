@@ -5,6 +5,7 @@ import {execFileSync} from 'node:child_process';
 import {applyPlatformBrand} from './apply-platform-brand.mjs';
 import {applyPlatformDirect} from './apply-platform-direct.mjs';
 import {applyPlatformSite} from './apply-platform-site.mjs';
+import {applyPlatformMp3Policy} from './apply-platform-mp3-upload.mjs';
 const origin='https://sonora-independent-music.kai-ma.chatgpt.site';
 const manifest=await fetch(origin+'/source/manifest.json?release='+Date.now()).then(r=>{if(!r.ok)throw Error('Release manifest unavailable');return r.json()});
 if(!/^[a-f0-9]{64}$/.test(manifest.sha256)||manifest.url!=='/source/rinlu-player-source.tar.gz')throw Error('Invalid release manifest');
@@ -24,6 +25,7 @@ for(const [path,sha]of Object.entries(index.files)){if(path.startsWith('/')||pat
 await applyPlatformBrand(source);
 await applyPlatformDirect(source);
 await applyPlatformSite(source);
+await applyPlatformMp3Policy(source);
 await writeFile('.platform-source/release.json',JSON.stringify({release:manifest.release,source_sha256:manifest.sha256,published_at:new Date().toISOString(),backend:origin})+'\n');
 if(process.env.GITHUB_OUTPUT)await writeFile(process.env.GITHUB_OUTPUT,'changed=true\n',{flag:'a'});
 console.log('Verified canonical platform source',manifest.sha256,'files',Object.keys(index.files).length);

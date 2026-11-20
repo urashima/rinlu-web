@@ -1,0 +1,45 @@
+name: Validate MP3 192kbps+ CBR and VBR upload
+on:
+  push:
+    branches: [feature/mp3-192plus-vbr-upload]
+    paths:
+      - 'services/mp3-policy/**'
+      - 'scripts/apply-platform-mp3-upload.mjs'
+      - 'scripts/apply-canonical-mp3-policy.mjs'
+      - 'scripts/test-canonical-mp3-policy.mjs'
+      - 'scripts/prepare-platform.mjs'
+      - 'scripts/package-platform.mjs'
+      - '.github/workflows/check-mp3-upload-policy.yml'
+permissions:
+  contents: read
+jobs:
+  mp3-acceptance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Test frame-accurate MP3 average bitrate policy
+        run: node --test services/mp3-policy/mp3-upload-policy.test.mjs
+      - name: Verify original RINLU Site source and apply creator policy
+        run: node scripts/prepare-platform.mjs
+      - name: Apply exact canonical D1 MP3 backend change
+        run: node scripts/apply-canonical-mp3-policy.mjs
+      - name: Regression-test actual canonical backend parser
+        run: node scripts/test-canonical-mp3-policy.mjs
+      - name: Verify RINLU frontend and Docker compilation
+        run: |
+          set -euo pipefail
+          npm install --global pnpm@11.25.0
+          cd .platform-source/rinlu-player-source
+          pnpm install --frozen-lockfile
+          pnpm exec vite build --config deployment/platform/vite.config.mjs
+          cd ../..
+          node scripts/package-platform.mjs
+          node --check platform-runtime/server.mjs
+          node --check scripts/apply-platform-mp3-upload.mjs
+          test -f platform-runtime/public/source/mp3-upload-policy.ts
+          grep -q 'mp3-average-192kbps-cbr-vbr' platform-runtime/public/_release.json
+          echo 'RINLU MP3 192kbps+ CBR/VBR UI and canonical source compile succeeded.'
