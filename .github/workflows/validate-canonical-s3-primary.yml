@@ -1,0 +1,51 @@
+name: Validate canonical S3 primary Site backend patch
+on:
+  push:
+    branches: [feature/ovh-s3-exclusive-primary]
+    paths:
+      - 'canonical-patch/**'
+      - 'scripts/apply-canonical-s3-primary.mjs'
+      - '.github/workflows/validate-canonical-s3-primary.yml'
+permissions:
+  contents: read
+jobs:
+  canonical-source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Retrieve and verify original RINLU Site source archive
+        run: node scripts/prepare-platform.mjs
+      - name: Apply full S3-only canonical Worker patch with exact anchor validation
+        run: node scripts/apply-canonical-s3-primary.mjs
+      - name: Install canonical TypeScript compiler from exact source lockfile
+        run: |
+          npm install --global pnpm@11.25.0
+          cd .platform-source/rinlu-player-source
+          pnpm install --frozen-lockfile
+      - name: Parse all affected backend TS modules
+        run: |
+          cd .platform-source/rinlu-player-source
+          node --input-type=module <<'JS'
+          import fs from 'node:fs';
+          import ts from 'typescript';
+          const files=['lib/server.ts','lib/media-service.ts','lib/media-storage.ts','lib/s3-primary.ts','lib/s3-primary-service.ts'];
+          for(const file of files){
+            const source=fs.readFileSync(file,'utf8');
+            const result=ts.transpileModule(source,{fileName:file,reportDiagnostics:true,compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext,jsx:ts.JsxEmit.ReactJSX}});
+            const errors=(result.diagnostics||[]).filter(d=>d.category===ts.DiagnosticCategory.Error);
+            if(errors.length)throw Error(file+' syntax errors: '+errors.map(x=>ts.flattenDiagnosticMessageText(x.messageText,' ')).join('; '));
+            console.log('Validated canonical TypeScript syntax',file);
+          }
+          const s=fs.readFileSync('lib/server.ts','utf8'),media=fs.readFileSync('lib/media-service.ts','utf8'),store=fs.readFileSync('lib/media-storage.ts','utf8');
+          if(!s.includes("RINLU_S3_ONLY==='1'")||!s.includes('s3PrimaryRoute(req,p,u)'))throw Error('D1 S3 route or R2 upload denial missing');
+          if(!media.includes('s3Complete(req,j,inspectMp3)')||!media.includes('s3JobClaim(j,asset)'))throw Error('S3 private processor not connected');
+          if(!store.includes('S3 keys cannot be deleted')||!store.includes('Legacy R2 media writes are disabled'))throw Error('R2 read-only preservation missing');
+          JS
+      - name: Build current frontend and preserve legacy app routes
+        run: |
+          cd .platform-source/rinlu-player-source
+          pnpm exec vite build --config deployment/platform/vite.config.mjs
