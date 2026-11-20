@@ -87,7 +87,7 @@ def process_artwork(job):
             if len(frames)!=1 or frames[0].get('codec_name')!='mjpeg':
                 raise RuntimeError('Unsupported cover art stream')
             width=int(frames[0].get('width',0));height=int(frames[0].get('height',0))
-            if min(width,height)<500 or max(width,height)>8192 or abs(width/height-1)>.05:
+            if min(width,height)<500 or max(width,height)>1600 or abs(width/height-1)>.05:
                 raise RuntimeError('Cover artwork must be square and between 500 and 8192 pixels')
             command(['ffmpeg','-nostdin','-v','error','-protocol_whitelist','file,pipe',
                 '-f','image2','-i',str(source),'-frames:v','1','-map_metadata','-1',
@@ -141,7 +141,7 @@ def process(job):
             scan(source)
             metadata=json.loads(command(['ffprobe','-v','error','-protocol_whitelist','file,pipe','-show_entries','stream=codec_type,sample_rate,channels:stream_disposition=attached_pic:format=duration','-of','json',str(source)]))
             audio_stream(metadata)
-            command(['ffmpeg','-nostdin','-v','error','-protocol_whitelist','file,pipe','-i',str(source),'-map','0:a:0','-vn','-map_metadata','-1','-af','loudnorm=I=-16:TP=-1.5:LRA=11','-codec:a','libmp3lame','-b:a','128k','-ar','44100','-ac','2','-id3v2_version','3','-f','mp3',str(output)],timeout=240)
+            command(['ffmpeg','-nostdin','-v','error','-protocol_whitelist','file,pipe','-i',str(source),'-map','0:a:0','-vn','-map_metadata','-1','-af','loudnorm=I=-16:TP=-1.5:LRA=11','-codec:a','libmp3lame','-b:a','192k' if is_s3 else '128k','-ar','44100','-ac','2','-id3v2_version','3','-f','mp3',str(output)],timeout=240)
             if output.stat().st_size>32*1024*1024: raise RuntimeError('Rendition exceeds 32 MB; use a shorter recording')
             scan(output)
             if is_s3:
@@ -149,6 +149,7 @@ def process(job):
                 result=storage.put_rendition(validate_key(job['output_storage_key'],'rendition'),output)
                 post(job['complete'],{
                     'storage_provider':'ovh-s3',
+                    'kind':'audio',
                     'input_storage_key':job['input_storage_key'],
                     'output_storage_key':result['storage_key'],
                     'original_sha256':source_meta['sha256'],
