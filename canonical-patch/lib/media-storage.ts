@@ -22,14 +22,14 @@ function settings(){
  const {OVH_S3_ENDPOINT:endpoint,OVH_S3_REGION:region,OVH_S3_BUCKET:bucket,OVH_S3_ACCESS_KEY_ID:access,OVH_S3_SECRET_ACCESS_KEY:secret}=e;
  if(!endpoint&&!region&&!bucket&&!access&&!secret)return null;
  if(!endpoint||!region||!bucket||!access||!secret)fail(503,'OVH S3 media credentials are incomplete.');
- const url=new URL(endpoint);
- const suffix=region.startsWith('us-')?'us':'net';
- const expected='s3.'+region+'.io.cloud.ovh.'+suffix;
+ const url=new URL(endpoint!);
+ const suffix=region!.startsWith('us-')?'us':'net';
+ const expected='s3.'+region!+'.io.cloud.ovh.'+suffix;
  if(url.protocol!=='https:'||url.hostname!==expected||url.pathname!=='/'||url.search||url.hash||url.username||url.password||
-    !/^[a-z0-9-]+$/.test(region)||!/^[a-z0-9][a-z0-9.-]{2,63}$/.test(bucket)){
+    !/^[a-z0-9-]+$/.test(region!)||!/^[a-z0-9][a-z0-9.-]{2,63}$/.test(bucket!)){
   fail(503,'Invalid private OVH S3 endpoint.');
  }
- return {url,region,bucket,access,secret};
+ return {url,region:region!,bucket:bucket!,access:access!,secret:secret!};
 }
 async function request(cfg:NonNullable<ReturnType<typeof settings>>,method:string,key:string,headers:Headers,body?:ArrayBuffer){
  if(!isS3Primary(key)&&!/^[A-Za-z0-9/_\-.]{1,450}$/.test(key))fail(400,'Invalid media storage key.');
@@ -63,7 +63,7 @@ export const mediaStorage={
   if(cfg){
    const headers=new Headers(),range=options?.range;
    if(range)headers.set('Range','bytes='+range.offset+'-'+(range.offset+range.length-1));
-   const response=await request(cfg,'GET',key,headers);
+   const response=await request(cfg!,'GET',key,headers);
    if(response.ok){
     if(range&&response.status!==206){await response.body?.cancel();fail(502,'S3 did not honor byte range.');}
     const size=Number(response.headers.get('content-length'));
@@ -73,25 +73,25 @@ export const mediaStorage={
    await response.body?.cancel();
    if(isS3Primary(key))return null;
   }
-  return env.BUCKET!.get(key,options);
+  return (env as any).BUCKET.get(key,options);
  },
  async head(key:string){
   const cfg=configFor(key);
   if(cfg){
-   const response=await request(cfg,'HEAD',key,new Headers());
+   const response=await request(cfg!,'HEAD',key,new Headers());
    if(response.ok){const size=Number(response.headers.get('content-length'));await response.body?.cancel();return {size};}
    await response.body?.cancel();
    if(isS3Primary(key))return null;
   }
-  return env.BUCKET!.head(key);
+  return (env as any).BUCKET.head(key);
  },
  async put(key:string,value:ArrayBuffer|Uint8Array<ArrayBuffer>,options:{httpMetadata:{contentType:string}}){
   const s3Only=secretEnv().RINLU_S3_ONLY==='1';
   if(s3Only&&!isS3Primary(key))fail(409,'Legacy R2 media writes are disabled after cutover.');
   const cfg=configFor(key);
-  if(!cfg)return env.BUCKET!.put(key,value,options);
+  if(!cfg)return (env as any).BUCKET.put(key,value,options);
   const bytes=value instanceof ArrayBuffer?value:new Uint8Array(value).buffer;
-  const response=await request(cfg,'PUT',key,new Headers({'Content-Type':options.httpMetadata.contentType}),bytes);
+  const response=await request(cfg!,'PUT',key,new Headers({'Content-Type':options.httpMetadata.contentType}),bytes);
   await response.body?.cancel();
   if(!response.ok)fail(502,'S3 media PUT did not finish.');
  },
@@ -100,29 +100,29 @@ export const mediaStorage={
   for(const key of items){
    if(isS3Primary(key)){
     if(!cfg)fail(503,'S3 keys cannot be deleted without OVH configuration.');
-    const r=await request(cfg,'DELETE',key,new Headers());
+    const r=await request(cfg!,'DELETE',key,new Headers());
     await r.body?.cancel();
    }else if(secretEnv().RINLU_S3_ONLY==='1'){
     // Keep old R2 files as a read-only rollback set until audited retention purge.
     fail(409,'Legacy R2 retention is active; explicit migration cleanup required.');
    }else{
-    await env.BUCKET!.delete(key);
+    await (env as any).BUCKET.delete(key);
    }
   }
  }
 };
 export async function copyMediaToOvh(key:string){
  const cfg=settings();if(!cfg)fail(503,'Configure OVH object storage before migration.');
- const original=await env.BUCKET!.get(key);
+ const original=await (env as any).BUCKET.get(key);
  if(!original)return false;
  const content=await original.arrayBuffer();
  const expected=await mediaDigest(content);
- const existing=await request(cfg,'GET',key,new Headers());
+ const existing=await request(cfg!,'GET',key,new Headers());
  if(existing.ok&&await mediaDigest(await existing.arrayBuffer())===expected)return true;
  if(!existing.ok)await existing.body?.cancel();
- const saved=await request(cfg,'PUT',key,new Headers({'Content-Type':original.httpMetadata?.contentType||'application/octet-stream'}),content);
+ const saved=await request(cfg!,'PUT',key,new Headers({'Content-Type':original.httpMetadata?.contentType||'application/octet-stream'}),content);
  await saved.body?.cancel();if(!saved.ok)fail(502,'S3 migration PUT failed.');
- const copy=await request(cfg,'GET',key,new Headers());
+ const copy=await request(cfg!,'GET',key,new Headers());
  if(!copy.ok||await mediaDigest(await copy.arrayBuffer())!==expected)fail(502,'S3 media migration checksum differs.');
  return true;
 }
