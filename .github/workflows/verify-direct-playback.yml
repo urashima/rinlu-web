@@ -1,0 +1,21 @@
+name: Production S3 direct audio smoke test
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/verify-direct-playback-prod.mjs'
+      - '.github/workflows/verify-direct-playback.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Verify public tracks use signed private S3 Range GET and CORS
+        run: node scripts/verify-direct-playback-prod.mjs
