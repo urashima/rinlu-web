@@ -41,7 +41,7 @@ if [[ -e /etc/rinlu/storage.env || -L /etc/rinlu/storage.env ]]; then
   [[ $(stat -c %u /etc/rinlu/storage.env) == 0 && $(stat -c %a /etc/rinlu/storage.env) == 600 ]] || { echo 'Storage file must be root-owned with mode 600.' >&2; exit 2; }
   storage_flags=(--env-file /etc/rinlu/storage.env)
 fi
-start_platform(){ docker run -d --name rinlu-platform --network rinlu-music --restart unless-stopped --read-only --tmpfs /tmp:size=16m --memory 256m --cpus 1 --pids-limit 100 --cap-drop ALL --security-opt no-new-privileges --env-file /etc/rinlu/google.env "${storage_flags[@]}" -e NODE_ENV=production "$1" >/dev/null; }
+start_platform(){ docker run -d --name rinlu-platform --network rinlu-music --restart unless-stopped --read-only --tmpfs /tmp:size=16m --memory 384m --cpus 1 --pids-limit 100 --cap-drop ALL --security-opt no-new-privileges --env-file /etc/rinlu/google.env "${storage_flags[@]}" -e NODE_ENV=production "$1" >/dev/null; }
 start_charts(){ docker run -d --name rinlu-charts --network rinlu-music --restart unless-stopped --read-only --tmpfs /tmp:size=768m,mode=1777 --memory 1536m --cpus 0.75 --cpu-shares 128 --pids-limit 100 --cap-drop ALL --security-opt no-new-privileges -e NODE_ENV=production "$1" >/dev/null; }
 start_web(){ docker run -d --name rinlu-web --network rinlu-music --restart unless-stopped --memory 256m --cpus 0.5 --security-opt no-new-privileges -p 0.0.0.0:80:80 "$1" >/dev/null; }
 rollback(){

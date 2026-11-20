@@ -45,6 +45,8 @@ for (const name of ['OVH_S3_ACCESS_KEY_ID', 'OVH_S3_SECRET_ACCESS_KEY']) {
 }
 process.stdout.write([
   'RINLU_STORAGE_PROVIDER=s3',
+  'RINLU_S3_UPLOAD_MIRROR=' + (process.env.OVH_S3_UPLOAD_MIRROR === '0' ? '0' : '1'),
+  'RINLU_S3_PLAYBACK_CACHE=' + (process.env.OVH_S3_PLAYBACK_CACHE === '0' ? '0' : '1'),
   'RINLU_S3_BUCKET=' + bucket,
   'RINLU_S3_REGION=' + region,
   'RINLU_S3_ENDPOINT=' + url.origin,
