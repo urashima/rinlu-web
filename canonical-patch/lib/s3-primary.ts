@@ -53,7 +53,7 @@ async function readiness(){
  if(!await scannerReady())fail(503,'The private S3 malware scanner is not ready.');
  const pendingLegacy=await one("SELECT COUNT(*) n FROM media_jobs j JOIN assets a ON a.id=j.asset_id WHERE j.status IN ('pending','processing') AND a.storage_key NOT LIKE 'originals/%'");
  if(Number(pendingLegacy?.n||0)>0)fail(503,'Existing R2 processing jobs must finish before new primary writes.');
- return {contract:'rinlu-s3-primary-v1',provider:'ovh-s3',bucket:config.bucket,
+ return {contract:'rinlu-s3-primary-v1',provider:'ovh-s3',bucket:config!.bucket,
    database:'ready',scanner:'ready',processing:'ready',quarantine:true,r2_dual_write:false};
 }
 
