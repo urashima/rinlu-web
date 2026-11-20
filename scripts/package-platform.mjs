@@ -1,6 +1,7 @@
 import {createHash} from 'node:crypto';
 import {cp, mkdir, readFile, rm, stat, writeFile} from 'node:fs/promises';
 
+import './audit-platform-brand.mjs';
 const releaseDir = '.platform-source';
 const source = releaseDir + '/rinlu-player-source';
 const runtime = 'platform-runtime';
