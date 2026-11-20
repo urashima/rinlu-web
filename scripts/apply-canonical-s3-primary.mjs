@@ -4,6 +4,7 @@
  */
 import {readFile,writeFile,copyFile} from 'node:fs/promises';
 import {join} from 'node:path';
+import {applyCanonicalMp3Policy} from './apply-canonical-mp3-policy.mjs';
 const root=process.argv[2]||'.platform-source/rinlu-player-source';
 async function replaceFile(rel,patch){
  const file=join(root,rel);let source=await readFile(file,'utf8');
@@ -66,4 +67,5 @@ await replaceFile('lib/media-service.ts',source=>{
  source=once(source,complete,"const j=await leased(req,p[2]);if(j.storage_key?.startsWith('originals/'))return await s3Complete(req,j,inspectMp3);if(Number(req.headers.get('content-length')||0)>35*1024*1024)",'S3 metadata-only scanned job completion');
  return source;
 });
+await applyCanonicalMp3Policy(root);
 console.log('Canonical S3-only D1 routes and R2 read-only legacy compatibility ready for independent Site deployment');
