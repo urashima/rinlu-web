@@ -65,7 +65,8 @@ const enrichedRelease={...release,gateway_overlay_sha256:gatewayOverlayHash,
   direct_overlay_sha256:directOverlayHash,
   direct_overlay:'s3-browser-direct-v1',
   brand_overlay_sha256:brandOverlayHash,
-  brand_overlay:'madimi-one-wordmark-v1'};
+  brand_overlay:'madimi-one-wordmark-v1',
+  social_preview_sha256:'7e70e193abb5732dafe68fc889b9ea9b0d823fb2fc97c8c7a72ed3015275b464'};
 await writeFile(runtime+'/public/_release.json',JSON.stringify(enrichedRelease)+'\n');
 
 
