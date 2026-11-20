@@ -25,7 +25,7 @@ await replaceFile('lib/server.ts',source=>{
    "import {mediaStorage} from './media-storage';\nimport {s3PrimaryRoute} from './s3-primary';",'S3 metadata route import');
  const handler="const u=await user(req);const method=req.method;const url=new URL(req.url);const resource=p[0]||'';";
  source=once(source,handler,handler+"const result=await s3PrimaryRoute(req,p,u);if(result)return result;",'canonical route dispatch');
- const upload="   if(resource==='upload'&&method==='POST'){\n";
+ const upload="if(resource==='upload'&&method==='POST'){";
  source=once(source,upload,upload+
    "    if((env as any).RINLU_S3_ONLY==='1')fail(426,'Legacy R2 uploads are disabled. Upload directly to OVH S3.');\n",
    'disable R2 upload entry');
