@@ -66,6 +66,10 @@ jobs:
           python3 -m py_compile services/media-worker/worker.py
           bash -n services/ovh/deploy-worker.sh
 
+      - name: Verify OVH S3 secret rendering without production credentials
+        if: steps.platform.outputs.changed == 'true'
+        run: node --test scripts/tests/render-ovh-s3-env.test.mjs
+
       - name: Configure verified SSH identity
         if: steps.platform.outputs.changed == 'true'
         env:
@@ -126,6 +130,29 @@ jobs:
           [[ "$GOOGLE_CLIENT_SECRET" =~ ^[A-Za-z0-9_-]+$ ]] || { echo 'Missing or invalid Google client secret'; exit 1; }
           printf 'GOOGLE_CLIENT_ID=%s\nGOOGLE_CLIENT_SECRET=%s\n' '370963831446-7jm67b901aag972anf6t22vh6l7sltt0.apps.googleusercontent.com' "$GOOGLE_CLIENT_SECRET" |
             ssh -p "$PORT" -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes "$USER@$HOST" 'set -eu; umask 077; f=$(mktemp "$HOME/.rinlu-google.XXXXXX"); trap '\''rm -f "$f"'\'' EXIT; cat > "$f"; mv -f "$f" "$HOME/rinlu-google.env"'
+
+      - name: Stage optional OVH S3 credentials for the Docker platform
+        if: steps.platform.outputs.changed == 'true'
+        env:
+          OVH_S3_BUCKET: ${{ vars.OVH_S3_BUCKET }}
+          OVH_S3_REGION: ${{ vars.OVH_S3_REGION }}
+          OVH_S3_ENDPOINT: ${{ vars.OVH_S3_ENDPOINT }}
+          OVH_S3_ACCESS_KEY_ID: ${{ secrets.OVH_S3_ACCESS_KEY_ID }}
+          OVH_S3_SECRET_ACCESS_KEY: ${{ secrets.OVH_S3_SECRET_ACCESS_KEY }}
+          HOST: ${{ secrets.OVH_HOST }}
+          USER: ${{ secrets.OVH_USER }}
+          PORT: ${{ vars.OVH_SSH_PORT || '22' }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$OVH_S3_BUCKET" && -z "$OVH_S3_REGION" && -z "$OVH_S3_ENDPOINT" && -z "$OVH_S3_ACCESS_KEY_ID" && -z "$OVH_S3_SECRET_ACCESS_KEY" ]]; then
+            echo 'OVH S3 not configured yet; preserving the existing storage configuration.'
+            exit 0
+          fi
+          test -n "$HOST" && test -n "$USER"
+          node scripts/render-ovh-s3-env.mjs |
+            ssh -p "$PORT" -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes "$USER@$HOST" \
+              'set -eu; umask 077; tmp=$(mktemp "$HOME/.rinlu-storage.XXXXXX"); trap "rm -f \"$tmp\"" EXIT; cat > "$tmp"; test -s "$tmp"; chmod 600 "$tmp"; mv -f "$tmp" "$HOME/rinlu-storage.env"'
+          echo 'OVH S3 credentials staged securely for the next Docker publication.'
 
       - name: Publish site and verify HTTP 80
         if: steps.platform.outputs.changed == 'true'
