@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#080b17">
+<title>RINLU · Pulse Highway / GPU Warp Lab</title>
+<style>
+:root{color-scheme:dark;--accent:#88f3eb;--sub:#9aaac3;--bg:#080b17;--surface:#111827}
+*{box-sizing:border-box}html,body{padding:0;margin:0;height:100%;overflow:hidden;background:var(--bg);color:#f4f6ff;font-family:-apple-system,BlinkMacSystemFont,Inter,"Segoe UI",sans-serif}
+#scene{position:fixed;inset:0}canvas{display:block}#scene:after{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(90deg,rgba(5,9,19,.28),transparent 38%)}
+.header{position:fixed;top:22px;left:26px;z-index:3;display:flex;align-items:center;gap:13px;pointer-events:none}.brand{font-weight:950;font-size:19px;letter-spacing:.06em}.brand small{display:block;color:#a1b9d0;font-size:10px;font-weight:700;letter-spacing:.22em;margin-top:3px}.pulse{display:block;border-radius:50%;width:10px;height:10px;background:var(--accent);box-shadow:0 0 18px var(--accent)}
+.topstats{position:fixed;top:24px;right:27px;z-index:2;display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}.stat{border:1px solid #ffffff20;border-radius:14px;padding:8px 12px;background:#0c1425b8;backdrop-filter:blur(14px);min-width:76px}.stat small{display:block;color:#99a8bc;text-transform:uppercase;font-size:9px;letter-spacing:.13em;margin-bottom:2px}.stat b{font-size:16px;font-variant-numeric:tabular-nums;font-weight:650}
+.panel{position:fixed;top:101px;left:24px;width:340px;max-height:calc(100vh - 132px);overflow:auto;border:1px solid #cad9ee30;z-index:4;background:#0c1425eb;backdrop-filter:blur(25px);border-radius:20px;padding:18px;box-shadow:0 20px 90px #0007}.panel::-webkit-scrollbar{width:5px}.panel::-webkit-scrollbar-thumb{background:#61718c66;border-radius:99px}
+.chip{font-size:10px;color:#7ddacd;font-weight:750;letter-spacing:.15em}.title{margin:7px 0 4px;font-weight:750;font-size:21px;letter-spacing:-.035em}.intro{font-size:12px;color:#9dacc3;line-height:1.65;margin:0 0 14px}
+.line{height:1px;background:#ffffff16;margin:14px 0}.linehead{display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:12px;font-weight:650;margin:12px 0 7px}.linehead output{color:var(--accent);font:12px ui-monospace,SFMono-Regular,monospace}
+input[type=range]{appearance:none;width:100%;height:4px;border-radius:99px;background:#304156;outline:0;cursor:pointer}input[type=range]::-webkit-slider-thumb{appearance:none;width:15px;height:15px;border:3px solid #a2fff4;background:#0c1d2a;border-radius:50%;box-shadow:0 0 0 5px #7cf3e51a}
+select,input[type=url],button,.upload{width:100%;border-radius:11px;background:#1a293c;border:1px solid #52677e66;color:#e8f1ff;font:12px system-ui;padding:10px;outline:0}select,input[type=url]{margin-top:6px}input[type=url]{margin-bottom:8px}button,.upload{cursor:pointer;text-align:center}button:hover,.upload:hover{border-color:#8ffff4}button.primary{background:#9bf5e4;color:#06232c;font-weight:800;border:0}.actions{display:flex;gap:8px}.actions>*{flex:1}.upload{display:block;margin-top:8px}input[type=file]{display:none}
+.note{font-size:11px;color:#9db1c7;line-height:1.7;margin-top:13px}#event{font-size:11px;color:#a3edc0;line-height:1.6;margin-top:12px;white-space:pre-wrap;overflow-wrap:anywhere}#event.error{color:#ff9ba7}.footer{position:fixed;bottom:18px;right:26px;z-index:2;font-size:11px;color:#a4b7cf;text-shadow:0 2px 12px #000}.mobile-toggle{display:none}
+@media(max-width:780px){.header{top:17px;left:17px}.brand{font-size:16px}.topstats{top:68px;left:14px;right:auto;gap:5px}.stat{padding:6px 9px;min-width:66px}.stat b{font-size:13px}.panel{top:auto;left:8px;right:8px;bottom:8px;width:auto;max-height:65vh;padding:15px;border-radius:16px}.panel.collapsed{max-height:54px;overflow:hidden}.mobile-toggle{display:block;float:right;background:none;border:0;padding:0;color:#9bf5e4;width:auto;font-size:11px}.footer{display:none}}
+</style>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js","@sparkjsdev/spark":"https://sparkjs.dev/releases/spark/2.4.0/spark.module.js"}}</script>
+</head>
+<body>
+<div id="scene"></div>
+<header class="header"><span class="pulse"></span><div class="brand">rinlu <small>PULSE HIGHWAY · GPU LAB</small></div></header>
+<div class="topstats"><div class="stat"><small>Render</small><b id="fps">— FPS</b></div><div class="stat"><small>Distance</small><b id="travel">0 m</b></div><div class="stat"><small>Splats</small><b id="counts">—</b></div><div class="stat"><small>GPU</small><b id="gpu">—</b></div></div>
+<aside class="panel" id="panel"><button type="button" class="mobile-toggle" id="toggle">展开 / 收起</button><div class="chip">EXPERIMENT · 0.2</div><h1 class="title">连续路径变形</h1><p class="intro">每个 Gaussian 独立按赛道切线旋转和平移；和整段刚性转弯实时 A/B 对比。默认使用无需上传的程序化通道。</p>
+<div class="linehead">变形模式</div><select id="mode"><option value="gpu">GPU per-Gaussian 连续弯曲</option><option value="rigid">Rigid 整段转弯（对照）</option></select>
+<div class="linehead">弯曲幅度 <output id="amplitudeOut">1.20 m</output></div><input id="amplitude" type="range" min="0" max="3" value="1.2" step=".05">
+<div class="linehead">弯曲波长 <output id="wavelengthOut">36 m</output></div><input id="wavelength" type="range" min="20" max="100" value="36" step="1">
+<div class="linehead">弯曲作用距离 <output id="lengthOut">120 m</output></div><input id="length" type="range" min="20" max="240" value="120" step="5">
+<div class="linehead">弯曲起点 <output id="startOut">-16 m</output></div><input id="start" type="range" min="-40" max="100" value="-16" step="2">
+<div class="linehead">前进速度 <output id="speedOut">5 m/s</output></div><input id="speed" type="range" min="0" max="28" value="5" step=".5">
+<div class="linehead">切片数量 <output id="tilesOut">4</output></div><input id="tiles" type="range" min="2" max="5" value="4" step="1">
+<div class="actions" style="margin-top:13px"><button id="pause">暂停</button><button id="reset">重置</button><button id="guide">隐藏轨道线</button></div>
+<div class="line"></div><div class="chip">ASSET LOADER</div><p class="note" style="margin-top:6px">默认使用程序化 3DGS 演示通道。可以导入上一版裁切的 SPZ，文件仅在你的浏览器内解码，不上传服务器。</p><label class="upload" for="file">选择本地 .spz / .ply 文件<input id="file" type="file" accept=".spz,.ply,.splat,.ksplat,.sog,.rad"></label><button id="demo" style="margin-top:8px">还原程序化测试通道</button><input id="assetUrl" type="url" placeholder="或输入公开 SPZ 地址（需支持 CORS）"><button id="loadUrl">加载 URL 资源</button>
+<div id="event">启动中…</div><p class="note">4 段 × 8m 循环步长，单段资源 10m，邻段交叠 2m。动态重定位发生在跨越切片边界时，避免每帧重建所有 Gaussian。GPU 连续弯曲修正高斯中心与朝向，未精确变形协方差。手机请先使用程序化通道。</p></aside>
+<div class="footer">SPACE 暂停　·　R 重置　·　WebGL2 / Three.js / Spark 2.4.0</div>
+<script type="module">
+import * as THREE from 'three';
+import { SparkRenderer, SplatMesh, PackedSplats, dyno } from '@sparkjsdev/spark';
+const $ = id => document.getElementById(id);
+const state={amplitude:1.2,wavelength:36,length:120,start:-16,speed:5,tiles:4,mode:'gpu',pause:false,guide:true};
+let travel=0,frames=0,lastStat=performance.now(),lastGuide=-999,assetId=0,instances=[],commonSplats=null,pointsPerTile=0;
+const say=(s,bad=false)=>{ $('event').textContent=s;$('event').className=bad?'error':''; };
+window.addEventListener('error',e=>say('运行错误：'+e.message,true));
+window.addEventListener('unhandledrejection',e=>say('异步错误：'+String(e.reason),true));
+const cv=document.createElement('canvas');
+if(!cv.getContext('webgl2')){say('当前浏览器不支持 WebGL2，无法测试 Spark GPU 变形',true);throw Error('WebGL2 unavailable');}
+const scene=new THREE.Scene();scene.background=new THREE.Color('#081020');scene.fog=new THREE.FogExp2('#081020',0.016);
+const camera=new THREE.PerspectiveCamera(74,innerWidth/innerHeight,.09,130);
+const renderer=new THREE.WebGLRenderer({antialias:false,powerPreference:'high-performance'});
+renderer.setPixelRatio(Math.min(devicePixelRatio,1.25));renderer.setSize(innerWidth,innerHeight);$('scene').append(renderer.domElement);
+scene.add(new SparkRenderer({renderer}));
+$('gpu').textContent=(renderer.getContext().getExtension('WEBGL_debug_renderer_info') ? renderer.getContext().getParameter(renderer.getContext().getExtension('WEBGL_debug_renderer_info').UNMASKED_RENDERER_WEBGL).slice(0,14) : 'WebGL2');
+window.addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
+function smooth(a,b,x){const t=Math.max(0,Math.min(1,(x-a)/Math.max(.001,b-a)));return t*t*(3-2*t)}
+function safeA(){let w=2*Math.PI/state.wavelength;return Math.min(state.amplitude,.65/(3.6*w*w))}
+function env(s){let f=Math.min(6,Math.max(1,state.length*.12));return smooth(state.start,state.start+f,s)*(1-smooth(state.start+state.length-f,state.start+state.length,s));}
+function center(s){return safeA()*Math.sin(2*Math.PI*s/state.wavelength)*env(s)}
+function yaw(s){return Math.atan2(center(s+.015)-center(s-.015),.03)}
+const globalGLSL='float hwD(float a,float b,float x){float t=clamp((x-a)/max(0.001,b-a),0.0,1.0);return (t>0.0&&t<1.0)?6.0*t*(1.0-t)/max(0.001,b-a):0.0;}\nvec2 hwCurve(float s,float a,float lambda,float st,float len){float f=min(6.0,max(1.0,len*.12));float q=smoothstep(st,st+f,s);float v=smoothstep(st+len-f,st+len,s);float dq=hwD(st,st+f,s);float dv=hwD(st+len-f,st+len,s);float e=q*(1.0-v);float de=dq*(1.0-v)-q*dv;float w=6.28318530718/max(0.01,lambda);float sn=sin(w*s),cs=cos(w*s);return vec2(a*sn*e,a*(w*cs*e+sn*de));}\nvec4 hwQ(vec4 a,vec4 b){return vec4(a.w*b.xyz+b.w*a.xyz+cross(a.xyz,b.xyz),a.w*b.w-dot(a.xyz,b.xyz));}';
+const uniforms={a:dyno.dynoFloat(safeA()),w:dyno.dynoFloat(state.wavelength),st:dyno.dynoFloat(state.start),len:dyno.dynoFloat(state.length)};
+function modifier(off){return dyno.dynoBlock({gsplat:dyno.Gsplat},{gsplat:dyno.Gsplat},({gsplat})=>{let node=new dyno.Dyno({inTypes:{gsplat:dyno.Gsplat,a:'float',w:'float',st:'float',len:'float',off:'float'},outTypes:{gsplat:dyno.Gsplat},inputs:{gsplat,a:uniforms.a,w:uniforms.w,st:uniforms.st,len:uniforms.len,off},globals:()=>[globalGLSL],statements:({inputs:i,outputs:o})=>dyno.unindentLines(o.gsplat+' = '+i.gsplat+';\nfloat s = '+i.gsplat+'.center.z + '+i.off+';\nvec2 curve = hwCurve(s,'+i.a+','+i.w+','+i.st+','+i.len+');\nfloat theta=atan(curve.y);\nfloat c=cos(theta), sn=sin(theta);\nvec3 p='+i.gsplat+'.center;\n'+o.gsplat+'.center=vec3(curve.x+c*p.x,p.y,s-sn*p.x);\nvec4 q=vec4(0.0,sin(theta*.5),0.0,cos(theta*.5));\n'+o.gsplat+'.quaternion=normalize(hwQ(q,'+i.gsplat+'.quaternion));')});return {gsplat:node.outputs.gsplat};});}
+function setUniforms(){uniforms.a.value=safeA();uniforms.w.value=state.wavelength;uniforms.st.value=state.start;uniforms.len.value=state.length;instances.forEach(v=>{if(state.mode==='gpu'){v.mesh.updateVersion();}else{placeRigid(v);}});updateGuides();}
+function placeRigid(v){let s=v.off.value;v.mesh.position.set(center(s),0,s);v.mesh.rotation.y=yaw(s);}
+function setMode(){for(const v of instances){v.mesh.objectModifiers=state.mode==='gpu'?[v.mod]:[];if(state.mode==='gpu'){v.mesh.position.set(0,0,0);v.mesh.rotation.set(0,0,0);}else{placeRigid(v);}if(v.mesh.isInitialized)v.mesh.updateGenerator();}say(state.mode==='gpu'?'GPU 连续变形已启用':'整段刚性转弯已启用');}
+function constructDemo(){const splats=new PackedSplats();const pos=new THREE.Vector3(),sca=new THREE.Vector3(),quat=new THREE.Quaternion(),col=new THREE.Color(),normal=new THREE.Vector3(),axis=new THREE.Vector3(0,0,1);for(let iz=0;iz<76;iz++){let z=-5+10*(iz+.5)/76;let alpha=Math.min(1,(z+5)/1.5,(5-z)/1.5);alpha=Math.max(0,alpha);for(let j=0;j<76;j++){let a=j/76*Math.PI*2;let nx=Math.cos(a),ny=Math.sin(a);pos.set(3.45*nx,2.55*ny,z);normal.set(nx,ny,0).normalize();quat.setFromUnitVectors(axis,normal);let row=Math.round((z+5)/2);let neon=(Math.abs((z+5)%2)<.13)||j%19===0;let grad=.25+.3*Math.sin(z*1.7+a*3);col.setRGB(neon?.25:.05+grad*.23,neon?.9:.32+grad*.20,neon?1:.58+grad*.23);sca.set(neon?.16:.19,neon?.19:.22,.036);splats.pushSplat(pos,sca,quat,alpha*.94,col);} }for(let z=-5;z<5;z+=.18){for(let lane=-2;lane<=2;lane++){pos.set(lane*.82,-2.12,z);sca.set(.08,.07,.16);quat.identity();col.setRGB(.09,lane===0?.83:.29,.95);splats.pushSplat(pos,sca,quat,Math.max(0,Math.min(1,(z+5)/1.6,(5-z)/1.6))*.9,col);}}return splats;}
+async function setSource(source,desc){const token=++assetId;say('载入 '+desc+' …');try{let base;if(source==='demo'){base=constructDemo();}else{const lead=source instanceof File?new SplatMesh({fileBytes:await source.arrayBuffer(),fileName:source.name,raycastable:false}):new SplatMesh({url:source,raycastable:false});await lead.initialized;if(token!==assetId)return;base=lead.packedSplats;scene.remove(lead);}
+if(token!==assetId)return;const old=instances;instances=[];for(const v of old){scene.remove(v.mesh);}
+commonSplats=base;pointsPerTile=base.numSplats;for(let i=0;i<state.tiles;i++){const off=dyno.dynoFloat((i-1)*8);const mod=modifier(off);const mesh=new SplatMesh({packedSplats:base,objectModifiers:state.mode==='gpu'?[mod]:[],raycastable:false});scene.add(mesh);const inst={mesh,off,mod};instances.push(inst);await mesh.initialized;if(token!==assetId)return;}
+setMode();positionTiles(true);$('counts').textContent=(pointsPerTile*instances.length/1000).toFixed(0)+'k';say('已加载 '+desc+' · 每段 '+pointsPerTile.toLocaleString()+' Gaussian · 共 '+instances.length+' 段');}catch(err){console.error(err);say('加载失败：'+String(err?.message||err),true);}}
+function positionTiles(force=false){const base=Math.floor(travel/8)-1;for(let i=0;i<instances.length;i++){let v=instances[i],newOffset=(base+i)*8;if(force||v.off.value!==newOffset){v.off.value=newOffset;if(state.mode==='gpu'){v.mesh.updateVersion();}else placeRigid(v);}}}
+const guides=[];for(let j=0;j<5;j++){let geom=new THREE.BufferGeometry();let line=new THREE.Line(geom,new THREE.LineBasicMaterial({color:j===0||j===4?0x8ff7ee:0x3f9bbb,transparent:true,opacity:j===0||j===4?.76:.48,depthTest:false}));guides.push(line);scene.add(line);}
+function updateGuides(){lastGuide=Math.floor(travel/2);for(let j=0;j<5;j++){let arr=[];for(let s=Math.floor(travel)-10;s<Math.floor(travel)+95;s+=.32){let x=(j-2)*.8,th=yaw(s);arr.push(center(s)+Math.cos(th)*x,-2.11,s-Math.sin(th)*x);}guides[j].geometry.dispose();guides[j].geometry=new THREE.BufferGeometry();guides[j].geometry.setAttribute('position',new THREE.Float32BufferAttribute(arr,3));guides[j].visible=state.guide;}}
+function control(id,key,unit,dec=0){const e=$(id);e.addEventListener('input',()=>{state[key]=Number(e.value);$(id+'Out').textContent=state[key].toFixed(dec)+unit;setUniforms();});}
+control('amplitude','amplitude',' m',2);control('wavelength','wavelength',' m');control('length','length',' m');control('start','start',' m');control('speed','speed',' m',1);
+$('mode').addEventListener('change',e=>{state.mode=e.target.value;setMode();positionTiles(true);});
+$('tiles').addEventListener('change',e=>{state.tiles=Number(e.target.value);$('tilesOut').textContent=state.tiles;setSource(commonSplats===null?'demo':'demo','程序化通道（切换段数后重载）');});
+$('pause').onclick=()=>{state.pause=!state.pause;$('pause').textContent=state.pause?'继续':'暂停';};
+$('reset').onclick=()=>{travel=0;positionTiles(true);updateGuides();};
+$('guide').onclick=()=>{state.guide=!state.guide;guides.forEach(g=>g.visible=state.guide);$('guide').textContent=state.guide?'隐藏轨道线':'显示轨道线';};
+$('file').addEventListener('change',e=>{const f=e.target.files?.[0];if(f)setSource(f,f.name+' ('+(f.size/1024/1024).toFixed(1)+' MiB)');});
+$('demo').onclick=()=>setSource('demo','程序化通道');
+$('loadUrl').onclick=()=>{const raw=$('assetUrl').value.trim();try{const u=new URL(raw);if(u.protocol!=='https:'&&u.protocol!=='http:')throw Error('URL 必须是 HTTPS 或 HTTP');setSource(u.href,'外部场景');}catch(e){say('地址不合法：'+e.message,true);}};
+$('toggle').onclick=()=>{$('panel').classList.toggle('collapsed');};
+window.addEventListener('keydown',e=>{if(e.code==='Space'){e.preventDefault();$('pause').click();}else if(e.code==='KeyR')$('reset').click();});
+const tick=new THREE.Clock(),ahead=new THREE.Vector3();function frame(){let dt=Math.min(.05,tick.getDelta());if(!state.pause)travel+=dt*state.speed;positionTiles();if(Math.floor(travel/2)!==lastGuide)updateGuides();camera.position.set(center(travel),-.72,travel);ahead.set(center(travel+7),-.72,travel+7);camera.lookAt(ahead);renderer.render(scene,camera);frames++;const now=performance.now();if(now-lastStat>900){$('fps').textContent=(frames*1000/(now-lastStat)).toFixed(0)+' FPS';$('travel').textContent=travel.toFixed(1)+' m';frames=0;lastStat=now;}}
+updateGuides();setSource('demo','程序化通道');renderer.setAnimationLoop(frame);
+</script>
+</body>
+</html>
