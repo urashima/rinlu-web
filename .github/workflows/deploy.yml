@@ -42,6 +42,8 @@ jobs:
         run: |
           node --check scripts/apply-platform-brand.mjs
           node --test scripts/test-platform-brand.mjs
+          node --check services/brand-logo/brand-logo.mjs
+          node --test services/brand-logo/brand-logo.test.mjs
 
       - name: Build the complete platform client and gateway
         if: steps.platform.outputs.changed == 'true'
@@ -201,6 +203,29 @@ jobs:
           actual=json.loads(pathlib.Path('/tmp/rinlu-live-release.json').read_text())
           assert actual['source_sha256']==expected['source_sha256'], 'Production release mismatch'
           print('Both sites synchronized:', actual['source_sha256'])
+          PY
+
+      - name: Verify original SVG logo production endpoints
+        if: steps.platform.outputs.changed == 'true'
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json,urllib.request
+          base='https://rinlu.com/music'
+          release=json.load(urllib.request.urlopen(base+'/_release.json',timeout=15))
+          assert release['brand_overlay']=='original-svg-live-v2'
+          assert release['brand_svg_archive_sha256']=='e9017abcd83fb9261df8df62df2ab91023a348ee3ea6ec860f9a54d469b11ec6'
+          for name in ('rinlu-full-vector','rinlu-icon-vector','rinlu-symbol-only'):
+              response=urllib.request.urlopen(base+'/brand/'+name+'.svg',timeout=15)
+              assert response.status==200 and response.headers['content-type'].startswith('image/svg+xml')
+              assert response.read(1024).lstrip().startswith(b'<svg')
+          for slot in ('full','compact','account'):
+              response=urllib.request.urlopen(base+'/api/brand/logo?slot='+slot,timeout=15)
+              assert response.status==200 and b'<svg' in response.read(4096)
+          config=json.load(urllib.request.urlopen(base+'/api/brand/config',timeout=15))
+          assert config['full'] in ('rinlu-full-vector','rinlu-full-cutout')
+          assert config['compact'] in ('rinlu-icon-vector','rinlu-icon-cutout','rinlu-symbol-only')
+          print('Original SVG logo routes, S3 configuration and production release verified')
           PY
 
       - name: Verify public HTTPS mobile API and release overlay
