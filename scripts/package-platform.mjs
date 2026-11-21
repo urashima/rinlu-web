@@ -1,4 +1,5 @@
 import {createHash} from 'node:crypto';
+import {execFileSync} from 'node:child_process';
 import {cp, mkdir, readFile, rm, stat, writeFile} from 'node:fs/promises';
 
 const releaseDir = '.platform-source';
@@ -16,10 +17,30 @@ for (const file of ['server.mjs', 'Dockerfile']) {
   await cp(source + '/deployment/platform/' + file, runtime + '/' + file);
 }
 await cp(source + '/platform-dist', runtime + '/public', {recursive: true});
+// Preserve all five SVGs exactly as supplied in RINLU-all-SVG.zip.
+const originalBase64=(await readFile('scripts/brand-assets/RINLU-all-SVG.zip.base64','utf8')).trim();
+const originalZip=Buffer.from(originalBase64,'base64');
+const originalZipHash=createHash('sha256').update(originalZip).digest('hex');
+if(originalZipHash!=='e9017abcd83fb9261df8df62df2ab91023a348ee3ea6ec860f9a54d469b11ec6')
+ throw Error('Original RINLU SVG zip checksum mismatch');
+await mkdir(runtime+'/public/brand',{recursive:true});
+execFileSync('python3',['-c',`import io,sys,zipfile
+from pathlib import Path
+names={'rinlu-full-cutout.svg','rinlu-full-vector.svg','rinlu-icon-cutout.svg','rinlu-icon-vector.svg','rinlu-symbol-only.svg'}
+with zipfile.ZipFile(io.BytesIO(sys.stdin.buffer.read())) as archive:
+ if set(archive.namelist())!=names:raise ValueError('Original SVG archive contents changed')
+ for name in sorted(names):
+  data=archive.read(name)
+  if len(data)>65536 or not data.startswith(b'<svg ') or b'<script' in data.lower() or b'<foreignObject' in data:raise ValueError('Unsafe original SVG '+name)
+  (Path('platform-runtime/public/brand')/name).write_bytes(data)
+`],{input:originalZip});
+
 
 // OVH-only read-only mobile API: the canonical Sites/D1 source remains untouched.
 // The gateway's additional corresponding source is published separately.
 const brandSource=await readFile('scripts/apply-platform-brand.mjs','utf8');
+const brandServiceSource=await readFile('services/brand-logo/brand-logo.mjs','utf8');
+const brandServiceHash=createHash('sha256').update(brandServiceSource).digest('hex');
 const siteOverlaySource=await readFile('scripts/apply-platform-site.mjs','utf8');
 const audioPolicyOverlaySource=await readFile('scripts/apply-platform-audio-policy.mjs','utf8');
 const audioPolicyAdminSource=await readFile('scripts/site-console/audio-upload-policy-admin.tsx','utf8');
@@ -61,7 +82,14 @@ const shareGateway=gatewayPatched
  .replace(gatewayImport,gatewayImport+"\nimport {createSharePreview} from './share-preview.mjs';")
  .replace(gatewayServer," const shareHandler=createSharePreview({s3:createOvhS3(process.env),backendOrigin,publicOrigin,accountBearer});\n"+gatewayServer)
  .replace(shareStart,match=>match+"\n  if(await shareHandler(req,res))return;");
-await writeFile(gatewayPath,shareGateway);
+const brandGateway=shareGateway
+ .replace(gatewayImport,gatewayImport+"\nimport {createBrandLogo} from './brand-logo.mjs';")
+ .replace(gatewayServer," const brandHandler=createBrandLogo({s3:createOvhS3(process.env),backendOrigin,publicOrigin,accountBearer});\n"+gatewayServer)
+ .replace(shareStart,match=>match+"\n  if(await brandHandler(req,res))return;");
+if(!brandGateway.includes('if(await brandHandler(req,res))return;'))throw Error('Brand gateway handler missing');
+
+await writeFile(gatewayPath,brandGateway);
+await writeFile(runtime+'/brand-logo.mjs',brandServiceSource);
 await cp('services/share-preview/share-preview.mjs',runtime+'/share-preview.mjs');
 await writeFile(runtime+'/mobile-api.mjs',mobileSource);
 await writeFile(runtime+'/ovh-s3.mjs',s3Source);
@@ -75,14 +103,16 @@ if(!dockerOriginal.includes(dockerAnchor)||dockerOriginal.includes('mobile-api.m
   throw Error('Canonical Dockerfile changed; abort production packaging');
 }
 await writeFile(dockerPath,dockerOriginal.replace(dockerAnchor,
-  dockerAnchor+'\nCOPY --chown=node:node share-preview.mjs ./share-preview.mjs\nCOPY --chown=node:node mobile-api.mjs ./mobile-api.mjs\nCOPY --chown=node:node ovh-s3.mjs ./ovh-s3.mjs\nCOPY --chown=node:node storage-gateway.mjs ./storage-gateway.mjs\nCOPY --chown=node:node direct-storage.mjs ./direct-storage.mjs\nCOPY --chown=node:node signing.mjs ./signing.mjs\nCOPY --chown=node:node cdn-signer.mjs ./cdn-signer.mjs'));
-const gatewayOverlayHash=createHash('sha256').update(shareGateway).digest('hex');
+  dockerAnchor+'\nCOPY --chown=node:node brand-logo.mjs ./brand-logo.mjs\nCOPY --chown=node:node share-preview.mjs ./share-preview.mjs\nCOPY --chown=node:node mobile-api.mjs ./mobile-api.mjs\nCOPY --chown=node:node ovh-s3.mjs ./ovh-s3.mjs\nCOPY --chown=node:node storage-gateway.mjs ./storage-gateway.mjs\nCOPY --chown=node:node direct-storage.mjs ./direct-storage.mjs\nCOPY --chown=node:node signing.mjs ./signing.mjs\nCOPY --chown=node:node cdn-signer.mjs ./cdn-signer.mjs'));
+const gatewayOverlayHash=createHash('sha256').update(brandGateway).digest('hex');
 const enrichedRelease={...release,gateway_overlay_sha256:gatewayOverlayHash,
   gateway_overlay:'rinlu-mobile-api-v1-ovh-s3-v2',
   direct_overlay_sha256:directOverlayHash,
   direct_overlay:'s3-browser-direct-v1',
   brand_overlay_sha256:brandOverlayHash,
-  brand_overlay:'madimi-one-wordmark-v1',
+  brand_overlay:'original-svg-live-v2',
+  brand_svg_archive_sha256:originalZipHash,
+  brand_service_sha256:brandServiceHash,
   site_overlay_sha256:siteOverlayHash,
   site_overlay:'console-site-share-v1',
   audio_policy_overlay:'d1-admin-live-audio-v1',
@@ -98,7 +128,8 @@ const indexHtml = await readFile(indexPath, 'utf8');
 if (!indexHtml.includes('</body>')) throw new Error('Built platform HTML has no closing body tag');
 if (indexHtml.includes('privacy-footer.js')) throw new Error('Duplicate privacy footer injection');
 await cp('scripts/privacy-footer.js', runtime + '/public/privacy-footer.js');
-await writeFile(indexPath, indexHtml.replace('</body>', '<script defer src="/music/privacy-footer.js"></script>\n</body>'));
+const favicon='<link rel="icon" type="image/svg+xml" href="/music/api/brand/logo?slot=compact">';
+await writeFile(indexPath, indexHtml.replace('</head>',favicon+'\n</head>').replace('</body>', '<script defer src="/music/privacy-footer.js"></script>\n</body>'));
 
 
 const destination = runtime + '/public/source';
@@ -114,6 +145,9 @@ await writeFile(destination+'/mp3-upload-inspect.ts',mp3InspectSource);
 await writeFile(destination+'/audio-upload-policy-backend.ts',audioPolicyBackendSource);
 await writeFile(destination+'/apply-canonical-audio-policy.mjs',audioPolicyBackendPatch);
 await writeFile(destination+'/audio-upload-policy.sha256',audioPolicyHash+'  audio-policy-overlay\n');
+await writeFile(destination+'/brand-logo-service.mjs',brandServiceSource);
+await writeFile(destination+'/brand-logo-service.sha256',brandServiceHash+'  brand-logo-service.mjs\n');
+await writeFile(destination+'/RINLU-all-SVG.zip.base64',originalBase64+'\n');
 await writeFile(destination+'/brand-wordmark-overlay.mjs',brandSource);
 await writeFile(destination+'/brand-wordmark-overlay.sha256',brandOverlayHash+'  brand-wordmark-overlay.mjs\n');
 await writeFile(destination+'/mobile-api-gateway.mjs',mobileSource);

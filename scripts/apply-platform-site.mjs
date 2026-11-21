@@ -33,9 +33,18 @@ export async function applyPlatformSite(root){
   "  </section>;\n}",
   "  </section>\n  <SiteShareAdmin/>\n  </div>;\n}",
   'app/site-font-admin.tsx ending');
+ source=replaceOnce(source,
+  "import {SiteShareAdmin} from './site-share-admin';",
+  "import {SiteShareAdmin} from './site-share-admin';\nimport {SiteLogoAdmin} from './site-logo-admin';",
+  'app/site-font-admin.tsx logo import');
+ source=replaceOnce(source,
+  '<SiteShareAdmin/>',
+  '<SiteLogoAdmin/>\n  <SiteShareAdmin/>',
+  'app/site-font-admin.tsx logo settings');
  await writeFile(componentPath,source);
  await copyFile('scripts/site-console/site-share-admin.tsx',join(app,'site-share-admin.tsx'));
- console.log('RINLU Site settings: font settings + S3 share image, original route unchanged');
+ await copyFile('scripts/site-console/site-logo-admin.tsx',join(app,'site-logo-admin.tsx'));
+ console.log('RINLU Site settings: font settings + S3 logo selection + share image, original route unchanged');
 }
 if(process.argv[1]&&import.meta.url===new URL('file://'+process.argv[1]).href){
  await applyPlatformSite(process.argv[2]||'.platform-source/rinlu-player-source');
