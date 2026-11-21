@@ -83,9 +83,9 @@ const shareGateway=gatewayPatched
  .replace(gatewayServer," const shareHandler=createSharePreview({s3:createOvhS3(process.env),backendOrigin,publicOrigin,accountBearer});\n"+gatewayServer)
  .replace(shareStart,match=>match+"\n  if(await shareHandler(req,res))return;");
 const brandGateway=shareGateway
- .replace(gatewayImport,gatewayImport+"\\nimport {createBrandLogo} from './brand-logo.mjs';")
- .replace(gatewayServer," const brandHandler=createBrandLogo({s3:createOvhS3(process.env),backendOrigin,publicOrigin,accountBearer});\\n"+gatewayServer)
- .replace(shareStart,match=>match+"\\n  if(await brandHandler(req,res))return;");
+ .replace(gatewayImport,gatewayImport+"\nimport {createBrandLogo} from './brand-logo.mjs';")
+ .replace(gatewayServer," const brandHandler=createBrandLogo({s3:createOvhS3(process.env),backendOrigin,publicOrigin,accountBearer});\n"+gatewayServer)
+ .replace(shareStart,match=>match+"\n  if(await brandHandler(req,res))return;");
 if(!brandGateway.includes('if(await brandHandler(req,res))return;'))throw Error('Brand gateway handler missing');
 
 await writeFile(gatewayPath,brandGateway);
@@ -129,7 +129,7 @@ if (!indexHtml.includes('</body>')) throw new Error('Built platform HTML has no 
 if (indexHtml.includes('privacy-footer.js')) throw new Error('Duplicate privacy footer injection');
 await cp('scripts/privacy-footer.js', runtime + '/public/privacy-footer.js');
 const favicon='<link rel="icon" type="image/svg+xml" href="/music/api/brand/logo?slot=compact">';
-await writeFile(indexPath, indexHtml.replace('</head>',favicon+'\\n</head>').replace('</body>', '<script defer src="/music/privacy-footer.js"></script>\\n</body>'));
+await writeFile(indexPath, indexHtml.replace('</head>',favicon+'\n</head>').replace('</body>', '<script defer src="/music/privacy-footer.js"></script>\n</body>'));
 
 
 const destination = runtime + '/public/source';
