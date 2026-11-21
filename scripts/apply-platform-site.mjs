@@ -35,11 +35,11 @@ export async function applyPlatformSite(root){
   'app/site-font-admin.tsx ending');
  source=replaceOnce(source,
   "import {SiteShareAdmin} from './site-share-admin';",
-  "import {SiteShareAdmin} from './site-share-admin';\\nimport {SiteLogoAdmin} from './site-logo-admin';",
+  "import {SiteShareAdmin} from './site-share-admin';\nimport {SiteLogoAdmin} from './site-logo-admin';",
   'app/site-font-admin.tsx logo import');
  source=replaceOnce(source,
   '<SiteShareAdmin/>',
-  '<SiteLogoAdmin/>\\n  <SiteShareAdmin/>',
+  '<SiteLogoAdmin/>\n  <SiteShareAdmin/>',
   'app/site-font-admin.tsx logo settings');
  await writeFile(componentPath,source);
  await copyFile('scripts/site-console/site-share-admin.tsx',join(app,'site-share-admin.tsx'));
