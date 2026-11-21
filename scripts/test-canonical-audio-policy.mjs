@@ -31,7 +31,7 @@ assert.throws(()=>inspectMp3(mp3([...Array(30).fill(96),...Array(30).fill(160)])
 assert.throws(()=>inspectMp3(mp3(Array(60).fill(128)),true,{...policy,minKbps:192}),/bitrate/);
 assert.doesNotThrow(()=>inspectMp3(mp3(Array(60).fill(96)),false),'processed rendition check should remain structural, not enforce upload policy');
 const server=await readFile(root+'/lib/server.ts','utf8');
-for(const needle of ['audioUploadPolicyAdmin(req,admin(u))',"resource==='upload-policy'&&method==='GET'","inspectMp3(a,true,accepted.formats.mp3)"]){
+for(const needle of ['audioUploadPolicyAdmin(req,admin(await user(req)))',"p[0]==='upload-policy'&&req.method==='GET'","inspectMp3(a,true,accepted.formats.mp3)"]){
  assert.ok(server.includes(needle),'Missing live D1 policy route or upload check: '+needle);
 }
 const adm=await readFile(root+'/app/site-font-admin.tsx','utf8');

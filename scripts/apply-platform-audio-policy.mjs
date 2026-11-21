@@ -12,6 +12,7 @@ export async function applyPlatformAudioPolicy(root){
   if(n!==1)throw Error('Canonical audio policy '+label+' changed ('+n+' matches)');
   return text.replace(search,replacement);
  }
+ if(!settings.includes('<AudioUploadPolicyAdmin/>')){
  settings=one(settings,
   "import {SiteShareAdmin} from './site-share-admin';",
   "import {SiteShareAdmin} from './site-share-admin';\nimport {AudioUploadPolicyAdmin} from './audio-upload-policy-admin';",
@@ -23,8 +24,14 @@ export async function applyPlatformAudioPolicy(root){
  await writeFile(admin,settings);
  await copyFile('scripts/site-console/audio-upload-policy-admin.tsx',join(root,'app/audio-upload-policy-admin.tsx'));
 
+ }
+
  const file=join(root,'app/rinlu.tsx');
  let source=await readFile(file,'utf8');
+ if(source.includes('const quality=inspectMp3Upload(')){
+  await readFile(join(root,'lib/mp3-upload-admission.ts'));
+  return;
+ }
  source=one(source,
   "import {compressArtwork} from '../lib/compress-artwork';",
   "import {compressArtwork} from '../lib/compress-artwork';\nimport {inspectMp3Upload} from '../lib/mp3-upload-admission';",
@@ -47,7 +54,7 @@ export async function applyPlatformAudioPolicy(root){
   'decoder hint');
  source=one(source,
   'MP3 · 192 or 320 kbps · Up to 25 MB',
-  'MP3 · 当前默认 128–320 kbps · CBR / VBR · 以后台实时设置为准 · Up to 25 MB',
+  'MP3 · Current bitrate policy applies · Up to 25 MB',
   'upload hint');
  source=one(source,
   '{tr(" dBFS")}</p>',

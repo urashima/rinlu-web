@@ -4,7 +4,7 @@
  * intentionally locked off until distinct trusted decoders/scanners exist.
  */
 import {z} from 'zod';
-import {one,q,db,now,fail,json,parse,log,type Row} from './backend';
+import {one,q,db,now,fail,json,parse,type Row} from './backend';
 
 export const audioFormatKeys=['mp3','wav','m4v','dolby_atmos','lossless'] as const;
 const locked=z.object({enabled:z.literal(false)}).strict();
@@ -53,7 +53,9 @@ export async function audioUploadPolicy(){
 export async function publicAudioUploadPolicy(){
  const policy=await audioUploadPolicy();
  return {
-  ...policy,
+  revision:policy.revision,
+  formats:policy.formats,
+  updatedAt:policy.updatedAt,
   supportedFormats:['mp3'],
   features:{
    mp3:{kind:'lossy-audio',supportsCbr:true,supportsVbr:true},
