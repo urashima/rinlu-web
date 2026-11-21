@@ -28,6 +28,8 @@ jobs:
         run: |
           node --check scripts/apply-platform-brand.mjs
           node --test scripts/test-platform-brand.mjs
+          node --check services/brand-logo/brand-logo.mjs
+          node --test services/brand-logo/brand-logo.test.mjs
       - name: Build website and package with gateway overlay
         run: |
           set -euo pipefail
@@ -41,6 +43,10 @@ jobs:
           node --check platform-runtime/server.mjs
           node --check platform-runtime/mobile-api.mjs
           test -f platform-runtime/public/source/mobile-api-gateway.mjs
+          test -f platform-runtime/public/brand/rinlu-full-vector.svg
+          test -f platform-runtime/public/brand/rinlu-icon-vector.svg
+          test -f platform-runtime/public/brand/rinlu-symbol-only.svg
+          test -f platform-runtime/public/source/RINLU-all-SVG.zip.base64
           grep -q 'mobile-api.mjs' platform-runtime/Dockerfile
           grep -q "api/mobile/v1/" platform-runtime/server.mjs
           python3 - <<'PY'
