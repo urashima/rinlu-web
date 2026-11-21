@@ -21,6 +21,12 @@ await cp(source + '/platform-dist', runtime + '/public', {recursive: true});
 // The gateway's additional corresponding source is published separately.
 const brandSource=await readFile('scripts/apply-platform-brand.mjs','utf8');
 const siteOverlaySource=await readFile('scripts/apply-platform-site.mjs','utf8');
+const audioPolicyOverlaySource=await readFile('scripts/apply-platform-audio-policy.mjs','utf8');
+const audioPolicyAdminSource=await readFile('scripts/site-console/audio-upload-policy-admin.tsx','utf8');
+const mp3InspectSource=await readFile('services/audio-policy/mp3-inspect.ts','utf8');
+const audioPolicyBackendSource=await readFile('canonical-patch/lib/audio-upload-policy.ts','utf8');
+const audioPolicyBackendPatch=await readFile('scripts/apply-canonical-audio-policy.mjs','utf8');
+const audioPolicyHash=createHash('sha256').update(audioPolicyOverlaySource+audioPolicyAdminSource+mp3InspectSource).digest('hex');
 const siteSettingsComponent=await readFile('scripts/site-console/site-share-admin.tsx','utf8');
 const siteOverlayHash=createHash('sha256').update(siteOverlaySource).digest('hex');
 const directOverlaySource=await readFile('scripts/apply-platform-direct.mjs','utf8');
@@ -78,7 +84,10 @@ const enrichedRelease={...release,gateway_overlay_sha256:gatewayOverlayHash,
   brand_overlay_sha256:brandOverlayHash,
   brand_overlay:'madimi-one-wordmark-v1',
   site_overlay_sha256:siteOverlayHash,
-  site_overlay:'console-site-share-v1'};
+  site_overlay:'console-site-share-v1',
+  audio_policy_overlay:'d1-admin-live-audio-v1',
+  audio_policy_default:'mp3-128kbps-cbr-vbr-only',
+  audio_policy_sha256:audioPolicyHash};
 await writeFile(runtime+'/public/_release.json',JSON.stringify(enrichedRelease)+'\n');
 
 
@@ -99,6 +108,12 @@ await cp('services/share-preview/share-preview.mjs',destination+'/share-preview.
 await writeFile(destination+'/site-console-overlay.mjs',siteOverlaySource);
 await writeFile(destination+'/site-console-overlay.sha256',siteOverlayHash+'  site-console-overlay.mjs\n');
 await writeFile(destination+'/site-share-admin.tsx',siteSettingsComponent);
+await writeFile(destination+'/audio-upload-policy-admin.tsx',audioPolicyAdminSource);
+await writeFile(destination+'/audio-upload-policy-overlay.mjs',audioPolicyOverlaySource);
+await writeFile(destination+'/mp3-upload-inspect.ts',mp3InspectSource);
+await writeFile(destination+'/audio-upload-policy-backend.ts',audioPolicyBackendSource);
+await writeFile(destination+'/apply-canonical-audio-policy.mjs',audioPolicyBackendPatch);
+await writeFile(destination+'/audio-upload-policy.sha256',audioPolicyHash+'  audio-policy-overlay\n');
 await writeFile(destination+'/brand-wordmark-overlay.mjs',brandSource);
 await writeFile(destination+'/brand-wordmark-overlay.sha256',brandOverlayHash+'  brand-wordmark-overlay.mjs\n');
 await writeFile(destination+'/mobile-api-gateway.mjs',mobileSource);

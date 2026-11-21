@@ -1,0 +1,60 @@
+name: Validate live audio upload policy and Platform Console
+on:
+  push:
+    branches: [feature/admin-live-audio-format-policy]
+    paths:
+      - 'canonical-patch/**'
+      - 'services/audio-policy/**'
+      - 'scripts/apply-platform-audio-policy.mjs'
+      - 'scripts/apply-canonical-audio-policy.mjs'
+      - 'scripts/test-canonical-audio-policy.mjs'
+      - 'scripts/prepare-platform.mjs'
+      - 'scripts/package-platform.mjs'
+      - '.github/workflows/check-live-audio-policy.yml'
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Validate CBR/VBR policy parser with minimum 128
+        run: node --test services/audio-policy/mp3-inspect.test.mjs
+      - name: Retrieve actual RINLU Site source + merge policy UI
+        run: node scripts/prepare-platform.mjs
+      - name: Patch original D1 backend with policy endpoints and upload validation
+        run: node scripts/apply-canonical-audio-policy.mjs
+      - name: Test actual patched backend and Platform Console role routing
+        run: node scripts/test-canonical-audio-policy.mjs
+      - name: Build RINLU app and verify source packaging
+        run: |
+          set -euo pipefail
+          npm install --global pnpm@11.25.0
+          cd .platform-source/rinlu-player-source
+          pnpm install --frozen-lockfile
+          pnpm exec vite build --config deployment/platform/vite.config.mjs
+          cd ../..
+          node scripts/package-platform.mjs
+          test -f platform-runtime/public/source/audio-upload-policy-admin.tsx
+          test -f platform-runtime/public/source/audio-upload-policy-backend.ts
+          grep -q 'd1-admin-live-audio-v1' platform-runtime/public/_release.json
+          node --check scripts/apply-canonical-audio-policy.mjs
+          node --check scripts/apply-platform-audio-policy.mjs
+      - name: Enforce new TypeScript checker diagnostics only
+        run: |
+          set -euo pipefail
+          cd .platform-source/rinlu-player-source
+          pnpm exec tsc --noEmit --pretty false > /tmp/audio-policy-tsc.txt 2>&1 || true
+          python3 - <<'PY'
+          from pathlib import Path
+          lines=Path('/tmp/audio-policy-tsc.txt').read_text().splitlines()
+          scoped=('lib/audio-upload-policy.ts','lib/mp3-upload-admission.ts','app/audio-upload-policy-admin.tsx','lib/media-service.ts')
+          failing=[line for line in lines if 'error TS' in line and line.startswith(scoped)]
+          print('New-policy type diagnostics:',len(failing))
+          for line in failing[:40]:print(line)
+          if failing:raise SystemExit(1)
+          PY
